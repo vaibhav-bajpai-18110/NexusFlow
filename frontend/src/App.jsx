@@ -14,7 +14,6 @@ import {
   Sparkles,
   Thermometer,
   Workflow,
-  Zap,
 } from 'lucide-react';
 import {
   Area,
@@ -29,6 +28,7 @@ import {
 import Sidebar from './components/Sidebar.jsx';
 import MetricCard from './components/MetricCard.jsx';
 import WorkflowCanvas from './components/WorkflowCanvas.jsx';
+import NodeInformationPanel from './components/NodeInformationPanel.jsx';
 
 const pageCopy = {
   Devices: {
@@ -115,10 +115,10 @@ const telemetry = [
 ];
 
 const devices = [
-  { name: 'Turbine 01', type: 'Temperature', status: 'Online', value: '78°C', icon: Thermometer },
-  { name: 'Motor 02', type: 'Vibration', status: 'Online', value: '2.1 mm/s', icon: Activity },
-  { name: 'Pump 03', type: 'Pressure', status: 'Offline', value: '—', icon: Radio },
-  { name: 'Boiler 04', type: 'Temperature', status: 'Online', value: '71°C', icon: Thermometer },
+  { name: 'Turbine 01', id: 'TURBINE_001', type: 'Temperature', status: 'Online', value: '78°C', icon: Thermometer },
+  { name: 'Motor 02', id: 'MOTOR_002', type: 'Vibration', status: 'Online', value: '2.1 mm/s', icon: Activity },
+  { name: 'Pump 03', id: 'PUMP_003', type: 'Pressure', status: 'Offline', value: '—', icon: Radio },
+  { name: 'Boiler 04', id: 'BOILER_004', type: 'Temperature', status: 'Online', value: '71°C', icon: Thermometer },
 ];
 
 const alerts = [
@@ -251,12 +251,13 @@ function DevicesPage() {
       </div>
       <div className="table-scroll">
         <table className="data-table">
-          <thead><tr><th>Device</th><th>Type</th><th>Status</th><th>Last value</th></tr></thead>
+          <thead><tr><th>Device name</th><th>Device ID</th><th>Type</th><th>Connection status</th><th>Last value</th></tr></thead>
           <tbody>{devices.map((device) => {
             const Icon = device.icon;
             return (
               <tr key={device.name}>
                 <td><span className="table-device"><span className="table-device-icon"><Icon size={14} /></span>{device.name}</span></td>
+                <td className="device-id-cell">{device.id}</td>
                 <td>{device.type}</td>
                 <td><span className={'device-status status-' + device.status.toLowerCase()}><i />{device.status}</span></td>
                 <td className="table-value">{device.value}</td>
@@ -265,7 +266,7 @@ function DevicesPage() {
           })}</tbody>
         </table>
       </div>
-      <p className="panel-footnote">Readings are illustrative and do not come from physical sensors.</p>
+      <p className="panel-footnote">Demo device names, IDs, statuses, and readings are illustrative sample data.</p>
     </section>
   );
 }
@@ -301,9 +302,16 @@ const nodeLibrary = [
 
 function PipelineWorkspace({ setNotice }) {
   const [selectedNode, setSelectedNode] = useState({
+    nodeType: 'device',
+    icon: Radio,
+    tone: 'device',
     category: 'SENSOR',
     title: 'Turbine 01',
-    description: 'Device: TURBINE_001',
+    deviceName: 'Turbine 01',
+    deviceId: 'TURBINE_001',
+    connectionStatus: 'Online',
+    description: 'Temperature sensor',
+    readingLabel: 'Latest sample',
     reading: '85°C',
   });
 
@@ -343,17 +351,7 @@ function PipelineWorkspace({ setNotice }) {
           <div className="canvas-footer"><span>4 steps · 3 connections</span><span>Illustrative sample pipeline</span></div>
         </div>
 
-        <aside className="properties-panel">
-          <div className="editor-section-heading"><strong>Properties</strong><span>Selected node</span></div>
-          <span className="property-category">{selectedNode?.category || 'NODE'}</span>
-          <h3>{selectedNode?.title || 'Select a node'}</h3>
-          <p>{selectedNode?.description || 'Choose a node on the canvas to inspect it.'}</p>
-          <div className="property-divider" />
-          <div className="property-field"><span>Average window</span><strong>5 readings</strong></div>
-          <div className="property-field"><span>Threshold</span><strong>&gt; 80°C</strong></div>
-          <div className="property-field"><span>On match</span><strong>Critical alert</strong></div>
-          <div className="property-note"><Zap size={13} /> This sample produces an alert when temperature exceeds 80°C.</div>
-        </aside>
+        <NodeInformationPanel node={selectedNode} />
       </section>
     </>
   );

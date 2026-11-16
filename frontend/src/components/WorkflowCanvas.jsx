@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   addEdge,
   applyEdgeChanges,
@@ -6,56 +6,42 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  Handle,
   MarkerType,
-  Position,
   ReactFlow,
 } from '@xyflow/react';
 import { Activity, Bell, GitBranch, Radio } from 'lucide-react';
+import DeviceNode from './DeviceNode.jsx';
+import WorkflowNode from './WorkflowNode.jsx';
 
-function FlowNode({ data, selected }) {
-  const Icon = data.icon;
-  return (
-    <div className={'flow-node flow-node-' + data.tone + (selected ? ' flow-node-selected' : '')}>
-      <Handle type="target" position={Position.Left} className="flow-handle" />
-      <div className="flow-node-top">
-        <span className={'flow-node-icon flow-node-icon-' + data.tone}><Icon size={14} /></span>
-        <span className="flow-node-category">{data.category}</span>
-        <span className="flow-node-state"><i /> {data.state}</span>
-      </div>
-      <h3>{data.title}</h3>
-      <p>{data.description}</p>
-      {data.reading && <div className="flow-reading"><span>{data.readingLabel || 'Sample'}</span><strong>{data.reading}</strong></div>}
-      <Handle type="source" position={Position.Right} className="flow-handle" />
-    </div>
-  );
-}
-
-const nodeTypes = { custom: memo(FlowNode) };
+const nodeTypes = { device: DeviceNode, workflow: WorkflowNode };
 const edgeStyle = { stroke: '#7888bd', strokeWidth: 1.5 };
 const markerEnd = { type: MarkerType.ArrowClosed, color: '#7888bd' };
 
 const initialNodes = [
   {
-    id: 'sensor',
-    type: 'custom',
+    id: 'sensor-turbine-01',
+    type: 'device',
     position: { x: 8, y: 74 },
+    selected: true,
     data: {
+      nodeType: 'device',
       icon: Radio,
-      tone: 'cyan',
-      category: 'SENSOR',
-      state: 'Sample',
-      title: 'Turbine 01',
-      description: 'Device · TURBINE_001',
-      readingLabel: 'Reading',
+      tone: 'device',
+      category: 'SENSOR DEVICE',
+      deviceName: 'Turbine 01',
+      deviceId: 'TURBINE_001',
+      connectionStatus: 'Online',
+      description: 'Temperature sensor',
+      readingLabel: 'Latest sample',
       reading: '85°C',
     },
   },
   {
-    id: 'filter',
-    type: 'custom',
+    id: 'average-last-five',
+    type: 'workflow',
     position: { x: 196, y: 74 },
     data: {
+      nodeType: 'workflow',
       icon: Activity,
       tone: 'blue',
       category: 'FILTER',
@@ -64,13 +50,15 @@ const initialNodes = [
       description: 'Smooth recent readings',
       readingLabel: 'Window',
       reading: 'Last 5 readings',
+      fields: [{ label: 'Average window', value: '5 readings' }],
     },
   },
   {
-    id: 'threshold',
-    type: 'custom',
+    id: 'temperature-threshold',
+    type: 'workflow',
     position: { x: 384, y: 74 },
     data: {
+      nodeType: 'workflow',
       icon: GitBranch,
       tone: 'violet',
       category: 'RULE',
@@ -79,13 +67,15 @@ const initialNodes = [
       description: 'Compare average value',
       readingLabel: 'Condition',
       reading: '> 80°C',
+      fields: [{ label: 'Condition', value: 'Average > 80°C' }],
     },
   },
   {
-    id: 'alert',
-    type: 'custom',
+    id: 'critical-alert',
+    type: 'workflow',
     position: { x: 572, y: 74 },
     data: {
+      nodeType: 'workflow',
       icon: Bell,
       tone: 'amber',
       category: 'ALERT',
@@ -94,22 +84,43 @@ const initialNodes = [
       description: 'Show in Alert Center',
       readingLabel: 'Action',
       reading: 'Create alert',
+      fields: [{ label: 'Action', value: 'Create critical alert' }],
     },
   },
 ];
 
 const initialEdges = [
-  { id: 'sensor-filter', source: 'sensor', target: 'filter', type: 'smoothstep', animated: true, label: 'telemetry', markerEnd, style: edgeStyle },
-  { id: 'filter-threshold', source: 'filter', target: 'threshold', type: 'smoothstep', animated: true, label: 'average', markerEnd, style: edgeStyle },
-  { id: 'threshold-alert', source: 'threshold', target: 'alert', type: 'smoothstep', animated: true, label: 'if > 80°C', markerEnd, style: edgeStyle },
+  { id: 'sensor-to-average', source: 'sensor-turbine-01', target: 'average-last-five', type: 'smoothstep', animated: true, label: 'telemetry', markerEnd, style: edgeStyle },
+  { id: 'average-to-threshold', source: 'average-last-five', target: 'temperature-threshold', type: 'smoothstep', animated: true, label: 'average', markerEnd, style: edgeStyle },
+  { id: 'threshold-to-alert', source: 'temperature-threshold', target: 'critical-alert', type: 'smoothstep', animated: true, label: 'if > 80°C', markerEnd, style: edgeStyle },
 ];
 
 const libraryData = {
-  sensor: { icon: Radio, tone: 'cyan', category: 'SENSOR', state: 'New', title: 'New sensor', description: 'Read device telemetry', readingLabel: 'Source', reading: 'Select device' },
-  filter: { icon: Activity, tone: 'blue', category: 'FILTER', state: 'New', title: 'Average values', description: 'Process recent readings', readingLabel: 'Window', reading: '5 readings' },
-  threshold: { icon: GitBranch, tone: 'violet', category: 'RULE', state: 'New', title: 'Threshold rule', description: 'Compare against a limit', readingLabel: 'Condition', reading: '> 80°C' },
-  alert: { icon: Bell, tone: 'amber', category: 'ALERT', state: 'New', title: 'Create alert', description: 'Record a pipeline event', readingLabel: 'Action', reading: 'Critical' },
+  sensor: {
+    nodeType: 'device', icon: Radio, tone: 'device', category: 'SENSOR DEVICE',
+    deviceName: 'New sensor', deviceId: 'Not assigned', connectionStatus: 'Not connected',
+    description: 'Configure a device source',
+  },
+  filter: {
+    nodeType: 'workflow', icon: Activity, tone: 'blue', category: 'FILTER', state: 'New',
+    title: 'Average values', description: 'Process recent readings', readingLabel: 'Window', reading: '5 readings',
+    fields: [{ label: 'Average window', value: '5 readings' }],
+  },
+  threshold: {
+    nodeType: 'workflow', icon: GitBranch, tone: 'violet', category: 'RULE', state: 'New',
+    title: 'Threshold rule', description: 'Compare against a limit', readingLabel: 'Condition', reading: '> 80°C',
+    fields: [{ label: 'Condition', value: 'Average > 80°C' }],
+  },
+  alert: {
+    nodeType: 'workflow', icon: Bell, tone: 'amber', category: 'ALERT', state: 'New',
+    title: 'Create alert', description: 'Record a pipeline event', readingLabel: 'Action', reading: 'Critical',
+    fields: [{ label: 'Action', value: 'Create critical alert' }],
+  },
 };
+
+function createNodeId() {
+  return globalThis.crypto?.randomUUID?.() || `node-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
 
 export default function WorkflowCanvas({ onNodeSelect }) {
   const [nodes, setNodes] = useState(initialNodes);
@@ -137,15 +148,14 @@ export default function WorkflowCanvas({ onNodeSelect }) {
   const onDrop = useCallback((event) => {
     event.preventDefault();
     if (!flow) return;
-    const type = event.dataTransfer.getData('application/reactflow');
-    const data = libraryData[type];
-    if (!data) return;
+    const template = libraryData[event.dataTransfer.getData('application/reactflow')];
+    if (!template) return;
     const position = flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
     setNodes((currentNodes) => currentNodes.concat({
-      id: 'node-' + Date.now(),
-      type: 'custom',
+      id: createNodeId(),
+      type: template.nodeType,
       position,
-      data,
+      data: { ...template },
     }));
   }, [flow]);
 
