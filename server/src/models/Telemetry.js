@@ -1,16 +1,21 @@
-﻿const mongoose = require("mongoose");
+﻿
+const mongoose = require("mongoose");
 
 const telemetrySchema = new mongoose.Schema(
   {
     deviceId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Device",
-      required: true
+      type: String,
+      required: true,
+      trim: true
+    },
+    sensorId: {
+      type: String,
+      required: true,
+      trim: true
     },
     timestamp: {
       type: Date,
-      required: true,
-      default: Date.now
+      required: true
     },
     metric: {
       type: String,
@@ -23,6 +28,7 @@ const telemetrySchema = new mongoose.Schema(
     },
     unit: {
       type: String,
+      required: true,
       trim: true
     },
     metadata: {
@@ -40,7 +46,7 @@ const telemetrySchema = new mongoose.Schema(
   }
 );
 
-telemetrySchema.index({ deviceId: 1, timestamp: -1 });
+telemetrySchema.index({ deviceId: 1, sensorId: 1, timestamp: -1 });
 
 module.exports =
   mongoose.models.Telemetry ||
