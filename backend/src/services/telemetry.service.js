@@ -1,7 +1,9 @@
 import { EventEmitter } from 'node:events';
+import { env } from '../config/env.js';
+import { deviceService } from './device.service.js';
 
 class TelemetryService extends EventEmitter {
-  constructor(maxHistory = 1000) {
+  constructor(maxHistory = env?.maxTelemetryBuffer || 1000) {
     super();
     this.maxHistory = maxHistory;
     /** @type {Array<object>} Ring buffer of recent telemetry */
@@ -40,6 +42,13 @@ class TelemetryService extends EventEmitter {
     });
 
     this.totalEventsReceived += 1;
+
+    // Update device registry service state
+    try {
+      deviceService.recordTelemetry(record);
+    } catch (err) {
+      console.error('[TelemetryService] Failed to update device registry for record:', err);
+    }
 
     // Emit event for real-time subscribers (RxJS rule engine, WebSockets)
     this.emit('telemetry', record);

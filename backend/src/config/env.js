@@ -18,6 +18,12 @@ function parsePort(rawPort, fallback = 5000) {
   return parsed;
 }
 
+function parseNumber(raw, fallback) {
+  if (raw === undefined || raw === '') return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 const nodeEnv = process.env.NODE_ENV || 'development';
 
 export const env = Object.freeze({
@@ -25,6 +31,7 @@ export const env = Object.freeze({
   port: parsePort(process.env.PORT, 5000),
   serviceName: process.env.SERVICE_NAME || 'nexusflow-backend',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  maxTelemetryBuffer: parseNumber(process.env.MAX_TELEMETRY_BUFFER, 1000),
   isProduction: nodeEnv === 'production',
   isTest: nodeEnv === 'test',
 });
