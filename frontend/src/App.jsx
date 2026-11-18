@@ -1,13 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Activity,
   ArrowUpRight,
   Bell,
   Check,
   ChevronDown,
-  CircleHelp,
   Cpu,
-  Menu,
   Plus,
   Radio,
   ShieldCheck,
@@ -26,6 +24,7 @@ import {
   YAxis,
 } from 'recharts';
 import Sidebar from './components/Sidebar.jsx';
+import Navbar from './components/Navbar.jsx';
 import MetricCard from './components/MetricCard.jsx';
 import WorkflowCanvas from './components/WorkflowCanvas.jsx';
 import NodeInformationPanel from './components/NodeInformationPanel.jsx';
@@ -127,6 +126,14 @@ const alerts = [
   { level: 'Resolved', device: 'Pump 03', message: 'Device connection restored', value: 'Recovered', tone: 'resolved' },
 ];
 
+function readSavedTheme() {
+  try {
+    return window.localStorage.getItem('nexusflow-theme') === 'light' ? 'light' : 'dark';
+  } catch {
+    return 'dark';
+  }
+}
+
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
@@ -203,9 +210,9 @@ function Overview({ onOpenPipelines, onOpenActivity }) {
                     <stop offset="95%" stopColor="#8da2ff" stopOpacity={0.01} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke="#263247" strokeDasharray="4 5" vertical={false} />
-                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: '#77869b', fontSize: 9 }} dy={8} />
-                <YAxis domain={[65, 90]} ticks={[70, 80, 90]} tickFormatter={(value) => value + '°'} axisLine={false} tickLine={false} tick={{ fill: '#77869b', fontSize: 9 }} />
+                <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="4 5" vertical={false} />
+                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-label)', fontSize: 9 }} dy={8} />
+                <YAxis domain={[65, 90]} ticks={[70, 80, 90]} tickFormatter={(value) => value + '°'} axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-label)', fontSize: 9 }} />
                 <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#607196', strokeDasharray: '3 4' }} />
                 <ReferenceLine y={80} stroke="#e8b86b" strokeDasharray="5 5" />
                 <Area type="monotone" dataKey="temperature" stroke="#91a4ff" strokeWidth={2} fill="url(#temperature-fill)" activeDot={{ r: 4, fill: '#c6d0ff', stroke: '#5368bb', strokeWidth: 2 }} isAnimationActive={false} />
@@ -385,6 +392,16 @@ export default function App() {
   const [activeView, setActiveView] = useState('Overview');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [notice, setNotice] = useState('');
+  const [theme, setTheme] = useState(readSavedTheme);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      window.localStorage.setItem('nexusflow-theme', theme);
+    } catch {
+      // The selected theme still works when browser storage is unavailable.
+    }
+  }, [theme]);
 
   const handleNavigate = (view) => {
     setActiveView(view);
@@ -398,20 +415,13 @@ export default function App() {
       <Sidebar activeItem={activeView} onNavigate={handleNavigate} mobileOpen={mobileNavOpen} />
       {mobileNavOpen && <button className="mobile-scrim" aria-label="Close menu" onClick={() => setMobileNavOpen(false)} />}
       <div className="app-main">
-        <header className="topbar">
-          <button className="mobile-menu icon-button" aria-label="Open navigation" onClick={() => setMobileNavOpen(true)}><Menu size={19} /></button>
-          <div className="breadcrumbs"><span>NexusFlow</span><span className="crumb-slash">/</span><strong>{activeView}</strong></div>
-          <div className="topbar-actions">
-            <button className="help-button" aria-label="Help"><CircleHelp size={17} /></button>
-            <button className="notification-button icon-button" aria-label="Notifications" onClick={() => setNotice('This demo has no unseen notifications.')}>
-              <Bell size={17} /><span className="notification-dot" />
-            </button>
-            <div className="topbar-divider" />
-            <button className="profile-button" aria-label="Open profile menu">
-              <span className="avatar">HV</span><ChevronDown size={14} />
-            </button>
-          </div>
-        </header>
+        <Navbar
+          activeView={activeView}
+          theme={theme}
+          onOpenMobileMenu={() => setMobileNavOpen(true)}
+          onNotificationClick={() => setNotice('This demo has no unseen notifications.')}
+          onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
+        />
 
         <main className="page-content">
           {activeView === 'Overview' ? (
