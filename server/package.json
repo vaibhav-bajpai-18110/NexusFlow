@@ -1,0 +1,13 @@
+{
+  "name": "nexusflow-server",
+  "version": "1.0.0",
+  "description": "NexusFlow backend database layer",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "dotenv": "*",
+    "mongoose": "*"
+  }
+}
