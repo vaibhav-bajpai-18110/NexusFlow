@@ -4,10 +4,12 @@
   "description": "NexusFlow backend database layer",
   "main": "src/index.js",
   "scripts": {
-    "test": "node --test tests/*.test.js"
-  },
+  "start": "node src/index.js",
+  "test": "node --test tests/*.test.js"
+},
   "dependencies": {
-    "dotenv": "*",
-    "mongoose": "*"
-  }
+  "dotenv": "*",
+  "express": "*",
+  "mongoose": "*"
+}
 }

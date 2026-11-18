@@ -35,6 +35,5 @@ const deviceSchema = new mongoose.Schema(
     collection: "devices"
   }
 );
-deviceSchema.index({ deviceId: 1 }, { unique: true });
 module.exports = mongoose.models.Device ||
   mongoose.model("Device", deviceSchema);
