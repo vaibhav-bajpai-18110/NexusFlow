@@ -574,3 +574,72 @@ html, body, .app-shell, .sidebar, .topbar, .workspace-switcher, .metric-card, .p
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   .workflow-canvas .react-flow__edge.animated path { animation: none; }
 }
+
+.device-management-grid { display: grid; grid-template-columns: minmax(275px, 0.8fr) minmax(0, 1.35fr); gap: 15px; align-items: start; }
+.registration-panel { min-width: 0; padding: 17px; }
+.registration-heading { display: flex; align-items: center; gap: 10px; padding-bottom: 15px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.registration-heading-icon { width: 31px; height: 31px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid rgba(130, 153, 255, 0.2); border-radius: 8px; color: #a5b2ff; background: rgba(130, 153, 255, 0.1); }
+.registration-heading h2 { margin: 0; color: #e3eaf5; font-size: 12px; font-weight: 600; }
+.registration-heading p { margin: 4px 0 0; color: #78879c; font-size: 9px; }
+.form-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 13px; }
+.form-field label { color: #aebbd0; font-size: 9px; font-weight: 600; }
+.form-field input, .form-field select { width: 100%; min-height: 36px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 7px; outline: 0; color: #dce5f3; background: #101925; font: inherit; font-size: 10px; transition: border-color 160ms ease, box-shadow 160ms ease, background-color 200ms ease; }
+.form-field input::placeholder { color: #66768d; }
+.form-field select { cursor: pointer; }
+.form-field input:focus, .form-field select:focus { border-color: rgba(130, 153, 255, 0.7); box-shadow: 0 0 0 3px rgba(130, 153, 255, 0.12); }
+.form-field input[aria-invalid="true"], .form-field select[aria-invalid="true"] { border-color: rgba(232, 123, 123, 0.7); }
+.field-hint, .field-error { font-size: 8px; line-height: 1.4; }
+.field-hint { color: #74849a; }
+.field-error { color: #ef9c9c; }
+.registration-submit { width: 100%; margin-top: 2px; }
+.registration-footnote { margin: 11px 0 0; color: #74849a; font-size: 8px; line-height: 1.5; }
+.device-list-panel { min-width: 0; }
+.registered-device-list { padding: 0 17px; }
+.registered-device { min-width: 0; display: grid; grid-template-columns: 31px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid rgba(155, 174, 202, 0.08); transition: padding 160ms ease, border-color 200ms ease; }
+.registered-device:first-child { border-top: 0; }
+.registered-device:hover { padding-right: 4px; padding-left: 4px; }
+.registered-device-icon { width: 29px; height: 29px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid rgba(130, 153, 255, 0.15); border-radius: 8px; color: #9baaff; background: rgba(130, 153, 255, 0.08); }
+.registered-device-identity { min-width: 0; }
+.registered-device-name-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.registered-device-name-row h3 { margin: 0; color: #d6dfed; font-size: 10px; font-weight: 600; }
+.registered-device-type { padding: 3px 6px; border: 1px solid rgba(155, 174, 202, 0.1); border-radius: 9px; color: #8998ad; background: rgba(155, 174, 202, 0.05); font-size: 7px; }
+.registered-device-identity code { display: block; margin-top: 4px; color: #8392a7; font: 8px Consolas, 'Courier New', monospace; overflow-wrap: anywhere; }
+.registered-device-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.registered-device-reading { color: #c2cede; font-size: 9px; font-variant-numeric: tabular-nums; }
+.status-pending { color: #e5ba71; }
+.status-pending i { background: currentColor; }
+.device-list-empty { min-height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 18px; text-align: center; }
+.device-list-empty strong { color: #d1dbea; font-size: 10px; }
+.device-list-empty p { margin: 0; color: #7d8ca0; font-size: 9px; }
+
+@media (max-width: 1000px) {
+  .device-management-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 460px) {
+  .registration-panel { padding: 13px; }
+  .registered-device-list { padding-right: 12px; padding-left: 12px; }
+  .registered-device { grid-template-columns: 29px minmax(0, 1fr) auto; gap: 7px; }
+  .registered-device-name-row h3 { font-size: 9px; }
+  .registered-device-type { font-size: 7px; }
+  .registered-device .device-status, .registered-device-reading { font-size: 8px; }
+}
+
+:root[data-theme="light"] .registration-heading { border-color: var(--border); }
+:root[data-theme="light"] .registration-heading h2 { color: #293951; }
+:root[data-theme="light"] .registration-heading p, :root[data-theme="light"] .registration-footnote { color: #718096; }
+:root[data-theme="light"] .registration-heading-icon { border-color: rgba(89, 111, 200, 0.17); color: #596fc8; background: rgba(89, 111, 200, 0.08); }
+:root[data-theme="light"] .form-field label { color: #46566e; }
+:root[data-theme="light"] .form-field input, :root[data-theme="light"] .form-field select { color: #293951; border-color: var(--border-strong); background: #ffffff; }
+:root[data-theme="light"] .form-field input::placeholder { color: #98a3b3; }
+:root[data-theme="light"] .field-hint { color: #718096; }
+:root[data-theme="light"] .field-error { color: #b74242; }
+:root[data-theme="light"] .registered-device { border-color: rgba(42, 61, 91, 0.09); }
+:root[data-theme="light"] .registered-device-icon { border-color: rgba(89, 111, 200, 0.14); color: #596fc8; background: rgba(89, 111, 200, 0.08); }
+:root[data-theme="light"] .registered-device-name-row h3 { color: #293951; }
+:root[data-theme="light"] .registered-device-type { color: #66758a; border-color: rgba(42, 61, 91, 0.1); background: rgba(42, 61, 91, 0.04); }
+:root[data-theme="light"] .registered-device-identity code { color: #6e7c91; }
+:root[data-theme="light"] .registered-device-reading { color: #53647a; }
+:root[data-theme="light"] .device-list-empty strong { color: #33445c; }
+:root[data-theme="light"] .device-list-empty p { color: #718096; }
+:root[data-theme="light"] .status-pending { color: #9c6916; }

@@ -28,12 +28,14 @@ import Navbar from './components/Navbar.jsx';
 import MetricCard from './components/MetricCard.jsx';
 import WorkflowCanvas from './components/WorkflowCanvas.jsx';
 import NodeInformationPanel from './components/NodeInformationPanel.jsx';
+import DeviceRegistrationForm from './components/DeviceRegistrationForm.jsx';
+import DeviceList from './components/DeviceList.jsx';
 
 const pageCopy = {
   Devices: {
     eyebrow: 'Connected fleet',
-    title: 'Device Registry',
-    description: 'Check device health, type, and most recent sample reading.',
+    title: 'Device Management',
+    description: 'Register devices and review their IDs, types, and connection status.',
     icon: Cpu,
   },
   Pipelines: {
@@ -113,11 +115,11 @@ const telemetry = [
   { time: '12:00', temperature: 85 },
 ];
 
-const devices = [
-  { name: 'Turbine 01', id: 'TURBINE_001', type: 'Temperature', status: 'Online', value: '78°C', icon: Thermometer },
-  { name: 'Motor 02', id: 'MOTOR_002', type: 'Vibration', status: 'Online', value: '2.1 mm/s', icon: Activity },
-  { name: 'Pump 03', id: 'PUMP_003', type: 'Pressure', status: 'Offline', value: '—', icon: Radio },
-  { name: 'Boiler 04', id: 'BOILER_004', type: 'Temperature', status: 'Online', value: '71°C', icon: Thermometer },
+const initialDevices = [
+  { name: 'Turbine 01', id: 'TURBINE_001', type: 'Temperature', status: 'Online', value: '78°C' },
+  { name: 'Motor 02', id: 'MOTOR_002', type: 'Vibration', status: 'Online', value: '2.1 mm/s' },
+  { name: 'Pump 03', id: 'PUMP_003', type: 'Pressure', status: 'Offline', value: '—' },
+  { name: 'Boiler 04', id: 'BOILER_004', type: 'Temperature', status: 'Online', value: '71°C' },
 ];
 
 const alerts = [
@@ -132,6 +134,18 @@ function readSavedTheme() {
   } catch {
     return 'dark';
   }
+}
+
+function readSavedDevices() {
+  try {
+    const savedDevices = JSON.parse(window.localStorage.getItem('nexusflow-devices') || 'null');
+    if (Array.isArray(savedDevices) && savedDevices.every((device) => (
+      device && typeof device.name === 'string' && typeof device.id === 'string' && typeof device.type === 'string'
+    ))) return savedDevices;
+  } catch {
+    // Use the sample registry if storage is unavailable or invalid.
+  }
+  return initialDevices;
 }
 
 function ChartTooltip({ active, payload, label }) {
@@ -249,31 +263,11 @@ function Overview({ onOpenPipelines, onOpenActivity }) {
   );
 }
 
-function DevicesPage() {
+function DevicesPage({ devices, onRegisterDevice }) {
   return (
-    <section className="panel data-panel">
-      <div className="panel-heading data-panel-heading">
-        <div><h2>Device Registry</h2><p>Sample devices from the project overview</p></div>
-        <span className="demo-label">SIMULATOR DATA</span>
-      </div>
-      <div className="table-scroll">
-        <table className="data-table">
-          <thead><tr><th>Device name</th><th>Device ID</th><th>Type</th><th>Connection status</th><th>Last value</th></tr></thead>
-          <tbody>{devices.map((device) => {
-            const Icon = device.icon;
-            return (
-              <tr key={device.name}>
-                <td><span className="table-device"><span className="table-device-icon"><Icon size={14} /></span>{device.name}</span></td>
-                <td className="device-id-cell">{device.id}</td>
-                <td>{device.type}</td>
-                <td><span className={'device-status status-' + device.status.toLowerCase()}><i />{device.status}</span></td>
-                <td className="table-value">{device.value}</td>
-              </tr>
-            );
-          })}</tbody>
-        </table>
-      </div>
-      <p className="panel-footnote">Demo device names, IDs, statuses, and readings are illustrative sample data.</p>
+    <section className="device-management-grid" aria-label="Device management">
+      <DeviceRegistrationForm existingDevices={devices} onRegister={onRegisterDevice} />
+      <DeviceList devices={devices} />
     </section>
   );
 }
@@ -393,6 +387,7 @@ export default function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const [theme, setTheme] = useState(readSavedTheme);
+  const [devices, setDevices] = useState(readSavedDevices);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -403,9 +398,22 @@ export default function App() {
     }
   }, [theme]);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('nexusflow-devices', JSON.stringify(devices));
+    } catch {
+      // Device registration remains usable for this session when storage is unavailable.
+    }
+  }, [devices]);
+
   const handleNavigate = (view) => {
     setActiveView(view);
     setMobileNavOpen(false);
+  };
+
+  const handleRegisterDevice = (device) => {
+    setDevices((currentDevices) => [{ ...device, status: 'Pending', value: '—' }, ...currentDevices]);
+    setNotice(`${device.name} registered and pending connection.`);
   };
 
   const currentPage = activeView === 'Overview' ? null : pageCopy[activeView];
@@ -432,7 +440,7 @@ export default function App() {
                 <div><p className="eyebrow">{currentPage.eyebrow}</p><h1>{currentPage.title}</h1><p className="page-description">{currentPage.description}</p></div>
                 <div className="heading-actions"><div className="system-pill"><span className="system-pulse" /> Simulator sample data</div></div>
               </section>
-              {activeView === 'Devices' && <DevicesPage />}
+              {activeView === 'Devices' && <DevicesPage devices={devices} onRegisterDevice={handleRegisterDevice} />}
               {activeView === 'Pipelines' && <PipelineWorkspace setNotice={setNotice} />}
               {activeView === 'Alerts' && <AlertsPage />}
               {activeView === 'Activity' && <ActivityPage />}
