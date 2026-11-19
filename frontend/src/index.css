@@ -592,25 +592,63 @@ html, body, .app-shell, .sidebar, .topbar, .workspace-switcher, .metric-card, .p
 .field-hint { color: #74849a; }
 .field-error { color: #ef9c9c; }
 .registration-submit { width: 100%; margin-top: 2px; }
+.registration-submit:disabled { cursor: wait; filter: none; opacity: 0.76; transform: none; }
 .registration-footnote { margin: 11px 0 0; color: #74849a; font-size: 8px; line-height: 1.5; }
-.device-list-panel { min-width: 0; }
-.registered-device-list { padding: 0 17px; }
-.registered-device { min-width: 0; display: grid; grid-template-columns: 31px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid rgba(155, 174, 202, 0.08); transition: padding 160ms ease, border-color 200ms ease; }
-.registered-device:first-child { border-top: 0; }
-.registered-device:hover { padding-right: 4px; padding-left: 4px; }
+.device-dashboard-column { min-width: 0; display: flex; flex-direction: column; gap: 15px; }
+.device-list-panel { min-width: 0; overflow: hidden; }
+.registered-device-list { display: flex; flex-direction: column; gap: 7px; padding: 0 17px 13px; }
+.registered-device { width: 100%; min-width: 0; display: grid; grid-template-columns: 31px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 11px; border: 1px solid rgba(155, 174, 202, 0.1); border-radius: 9px; color: var(--text); background: var(--surface-raised); text-align: left; cursor: pointer; transition: transform 160ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease; }
+.registered-device:hover { border-color: rgba(130, 153, 255, 0.38); background: var(--surface-soft); transform: translateY(-1px); }
+.registered-device:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.registered-device-selected { border-color: rgba(130, 153, 255, 0.62); background: rgba(130, 153, 255, 0.1); box-shadow: inset 3px 0 rgba(130, 153, 255, 0.8); }
+.registered-device-selected:hover { border-color: rgba(130, 153, 255, 0.72); }
 .registered-device-icon { width: 29px; height: 29px; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid rgba(130, 153, 255, 0.15); border-radius: 8px; color: #9baaff; background: rgba(130, 153, 255, 0.08); }
 .registered-device-identity { min-width: 0; }
 .registered-device-name-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.registered-device-name-row h3 { margin: 0; color: #d6dfed; font-size: 10px; font-weight: 600; }
+.registered-device-name-row strong { min-width: 0; color: #d6dfed; font-size: 10px; font-weight: 600; overflow-wrap: anywhere; }
 .registered-device-type { padding: 3px 6px; border: 1px solid rgba(155, 174, 202, 0.1); border-radius: 9px; color: #8998ad; background: rgba(155, 174, 202, 0.05); font-size: 7px; }
 .registered-device-identity code { display: block; margin-top: 4px; color: #8392a7; font: 8px Consolas, 'Courier New', monospace; overflow-wrap: anywhere; }
 .registered-device-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .registered-device-reading { color: #c2cede; font-size: 9px; font-variant-numeric: tabular-nums; }
 .status-pending { color: #e5ba71; }
 .status-pending i { background: currentColor; }
-.device-list-empty { min-height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 18px; text-align: center; }
+.status-online, .status-connected { color: #72d6a6; }
+.status-online i, .status-connected i { background: currentColor; }
+.status-offline, .status-disconnected { color: #e39b9b; }
+.status-offline i, .status-disconnected i { background: currentColor; }
+.status-unknown, .status-connecting { color: #e5ba71; }
+.status-unknown i, .status-connecting i { background: currentColor; }
+.status-error, .status-failed { color: #ef9c9c; }
+.status-error i, .status-failed i { background: currentColor; }
+.device-list-loading { display: flex; flex-direction: column; gap: 7px; padding: 0 17px 17px; }
+.device-skeleton { min-height: 57px; display: grid; grid-template-columns: 31px minmax(0, 1fr) 62px; align-items: center; gap: 10px; padding: 10px 11px; border: 1px solid var(--border); border-radius: 9px; }
+.skeleton-icon, .skeleton-copy i, .skeleton-status { display: block; border-radius: 6px; background: linear-gradient(100deg, var(--surface-soft) 20%, rgba(130, 153, 255, 0.14) 45%, var(--surface-soft) 70%); background-size: 220% 100%; animation: device-skeleton-shimmer 1.35s ease-in-out infinite; }
+.skeleton-icon { width: 29px; height: 29px; }
+.skeleton-copy { display: flex; flex-direction: column; gap: 7px; }
+.skeleton-copy i:first-child { width: min(58%, 150px); height: 8px; }
+.skeleton-copy i:last-child { width: min(36%, 96px); height: 6px; opacity: 0.7; }
+.skeleton-status { width: 54px; height: 16px; justify-self: end; }
+@keyframes device-skeleton-shimmer { to { background-position: -220% 0; } }
+.device-api-state { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 0 17px 17px; padding: 15px; border: 1px solid var(--border); border-radius: 9px; background: rgba(130, 153, 255, 0.045); }
+.device-api-state strong { color: var(--text); font-size: 10px; }
+.device-api-state p { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.55; overflow-wrap: anywhere; }
+.device-api-error { border-color: rgba(232, 123, 123, 0.24); background: rgba(232, 123, 123, 0.055); }
+.device-api-error strong { color: #efaaaa; }
+.device-list-empty { min-height: 164px; margin: 0 17px 17px; border: 1px dashed var(--border-strong); border-radius: 10px; background: rgba(130, 153, 255, 0.035); }
+.device-list-empty .registered-device-icon { margin-bottom: 3px; }
 .device-list-empty strong { color: #d1dbea; font-size: 10px; }
 .device-list-empty p { margin: 0; color: #7d8ca0; font-size: 9px; }
+.form-submit-error { margin: 9px 0 0; color: #ef9c9c; font-size: 9px; line-height: 1.5; overflow-wrap: anywhere; }
+.mini-spinner, .large-spinner { display: inline-block; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: nexusflow-spin 720ms linear infinite; }
+.mini-spinner { width: 13px; height: 13px; }
+.large-spinner { width: 22px; height: 22px; color: var(--blue); }
+@keyframes nexusflow-spin { to { transform: rotate(360deg); } }
+.node-information-state { min-height: 156px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 9px; padding: 16px 10px; }
+.node-information-state strong { color: var(--text); font-size: 10px; }
+.node-information-state p { margin: 0; color: var(--muted); font-size: 8px; line-height: 1.55; overflow-wrap: anywhere; }
+.node-information-error { align-items: flex-start; }
+.node-information-error > strong { color: #efaaaa; }
+.node-information-error .button { margin-top: 2px; }
 
 @media (max-width: 1000px) {
   .device-management-grid { grid-template-columns: 1fr; }
@@ -620,9 +658,11 @@ html, body, .app-shell, .sidebar, .topbar, .workspace-switcher, .metric-card, .p
   .registration-panel { padding: 13px; }
   .registered-device-list { padding-right: 12px; padding-left: 12px; }
   .registered-device { grid-template-columns: 29px minmax(0, 1fr) auto; gap: 7px; }
-  .registered-device-name-row h3 { font-size: 9px; }
+  .registered-device-name-row strong { font-size: 9px; }
   .registered-device-type { font-size: 7px; }
   .registered-device .device-status, .registered-device-reading { font-size: 8px; }
+  .device-list-loading { padding-right: 12px; padding-left: 12px; }
+  .device-api-state, .device-list-empty { margin-right: 12px; margin-left: 12px; }
 }
 
 :root[data-theme="light"] .registration-heading { border-color: var(--border); }
@@ -634,12 +674,24 @@ html, body, .app-shell, .sidebar, .topbar, .workspace-switcher, .metric-card, .p
 :root[data-theme="light"] .form-field input::placeholder { color: #98a3b3; }
 :root[data-theme="light"] .field-hint { color: #718096; }
 :root[data-theme="light"] .field-error { color: #b74242; }
-:root[data-theme="light"] .registered-device { border-color: rgba(42, 61, 91, 0.09); }
+:root[data-theme="light"] .registered-device { color: var(--text); border-color: rgba(42, 61, 91, 0.1); background: #f7f9fd; }
+:root[data-theme="light"] .registered-device:hover { border-color: rgba(89, 111, 200, 0.34); background: #f0f3fb; }
+:root[data-theme="light"] .registered-device-selected { border-color: rgba(89, 111, 200, 0.5); background: rgba(89, 111, 200, 0.08); box-shadow: inset 3px 0 rgba(89, 111, 200, 0.75); }
 :root[data-theme="light"] .registered-device-icon { border-color: rgba(89, 111, 200, 0.14); color: #596fc8; background: rgba(89, 111, 200, 0.08); }
-:root[data-theme="light"] .registered-device-name-row h3 { color: #293951; }
+:root[data-theme="light"] .registered-device-name-row strong { color: #293951; }
 :root[data-theme="light"] .registered-device-type { color: #66758a; border-color: rgba(42, 61, 91, 0.1); background: rgba(42, 61, 91, 0.04); }
 :root[data-theme="light"] .registered-device-identity code { color: #6e7c91; }
 :root[data-theme="light"] .registered-device-reading { color: #53647a; }
 :root[data-theme="light"] .device-list-empty strong { color: #33445c; }
 :root[data-theme="light"] .device-list-empty p { color: #718096; }
+:root[data-theme="light"] .device-list-empty, :root[data-theme="light"] .device-api-state { background: #f8faff; }
+:root[data-theme="light"] .device-api-error { border-color: rgba(183, 66, 66, 0.22); background: #fff8f8; }
+:root[data-theme="light"] .device-api-error strong, :root[data-theme="light"] .node-information-error > strong { color: #a63b3b; }
+:root[data-theme="light"] .form-submit-error { color: #b74242; }
+:root[data-theme="light"] .node-information-state strong { color: #33445c; }
+:root[data-theme="light"] .node-information-state p { color: #718096; }
 :root[data-theme="light"] .status-pending { color: #9c6916; }
+:root[data-theme="light"] .status-online, :root[data-theme="light"] .status-connected { color: #16845e; }
+:root[data-theme="light"] .status-offline, :root[data-theme="light"] .status-disconnected { color: #b74242; }
+:root[data-theme="light"] .status-unknown, :root[data-theme="light"] .status-connecting { color: #9c6916; }
+:root[data-theme="light"] .status-error, :root[data-theme="light"] .status-failed { color: #b74242; }

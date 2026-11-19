@@ -30,6 +30,7 @@ import WorkflowCanvas from './components/WorkflowCanvas.jsx';
 import NodeInformationPanel from './components/NodeInformationPanel.jsx';
 import DeviceRegistrationForm from './components/DeviceRegistrationForm.jsx';
 import DeviceList from './components/DeviceList.jsx';
+import { fetchDevice, fetchDevices, registerDevice } from './services/deviceApi.js';
 
 const pageCopy = {
   Devices: {
@@ -115,13 +116,6 @@ const telemetry = [
   { time: '12:00', temperature: 85 },
 ];
 
-const initialDevices = [
-  { name: 'Turbine 01', id: 'TURBINE_001', type: 'Temperature', status: 'Online', value: '78°C' },
-  { name: 'Motor 02', id: 'MOTOR_002', type: 'Vibration', status: 'Online', value: '2.1 mm/s' },
-  { name: 'Pump 03', id: 'PUMP_003', type: 'Pressure', status: 'Offline', value: '—' },
-  { name: 'Boiler 04', id: 'BOILER_004', type: 'Temperature', status: 'Online', value: '71°C' },
-];
-
 const alerts = [
   { level: 'Critical', device: 'Turbine 01', message: 'Temperature above threshold', value: '85°C', tone: 'critical' },
   { level: 'Warning', device: 'Motor 02', message: 'Vibration approaching limit', value: '2.1 mm/s', tone: 'warning' },
@@ -134,18 +128,6 @@ function readSavedTheme() {
   } catch {
     return 'dark';
   }
-}
-
-function readSavedDevices() {
-  try {
-    const savedDevices = JSON.parse(window.localStorage.getItem('nexusflow-devices') || 'null');
-    if (Array.isArray(savedDevices) && savedDevices.every((device) => (
-      device && typeof device.name === 'string' && typeof device.id === 'string' && typeof device.type === 'string'
-    ))) return savedDevices;
-  } catch {
-    // Use the sample registry if storage is unavailable or invalid.
-  }
-  return initialDevices;
 }
 
 function ChartTooltip({ active, payload, label }) {
@@ -263,11 +245,137 @@ function Overview({ onOpenPipelines, onOpenActivity }) {
   );
 }
 
-function DevicesPage({ devices, onRegisterDevice }) {
+function deviceIdOf(device) {
+  return device?.deviceId || device?.id || '';
+}
+
+function asDeviceNode(device) {
+  if (!device) return null;
+  const deviceId = deviceIdOf(device);
+  return {
+    nodeType: 'device',
+    category: 'DEVICE',
+    title: device.name || deviceId,
+    deviceName: device.name || deviceId,
+    deviceId,
+    deviceType: device.type || device.deviceType || 'Device',
+    connectionStatus: device.status || 'unknown',
+    readingLabel: 'Latest reading',
+    reading: device.lastValue ?? '—',
+    unit: device.unit || '',
+    location: device.location,
+    lastSeen: device.lastSeen,
+    description: device.description || '',
+  };
+}
+
+function DevicesPage({ setNotice }) {
+  const [devices, setDevices] = useState([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState('');
+  const [listRetry, setListRetry] = useState(0);
+  const [selectedDeviceId, setSelectedDeviceId] = useState('');
+  const [deviceDetails, setDeviceDetails] = useState(null);
+  const [deviceDetailsId, setDeviceDetailsId] = useState('');
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState('');
+  const [detailsRetry, setDetailsRetry] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setListLoading(true);
+    setListError('');
+
+    fetchDevices({ signal: controller.signal })
+      .then((result) => {
+        setDevices(result);
+        setSelectedDeviceId((currentId) => (
+          currentId && result.some((device) => deviceIdOf(device) === currentId)
+            ? currentId
+            : deviceIdOf(result[0])
+        ));
+      })
+      .catch((error) => {
+        if (error.name === 'AbortError') return;
+        setDevices([]);
+        setSelectedDeviceId('');
+        setListError(error.message || 'The device list could not be loaded.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setListLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [listRetry]);
+
+  useEffect(() => {
+    if (!selectedDeviceId) {
+      setDeviceDetails(null);
+      setDeviceDetailsId('');
+      setDetailsError('');
+      setDetailsLoading(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setDeviceDetails(null);
+    setDeviceDetailsId(selectedDeviceId);
+    setDetailsLoading(true);
+    setDetailsError('');
+
+    fetchDevice(selectedDeviceId, { signal: controller.signal })
+      .then((device) => setDeviceDetails(device))
+      .catch((error) => {
+        if (error.name === 'AbortError') return;
+        setDetailsError(error.message || 'Device details could not be loaded.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDetailsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [selectedDeviceId, detailsRetry]);
+
+  const handleRegisterDevice = async (device) => {
+    const createdDevice = await registerDevice(device);
+    const createdId = deviceIdOf(createdDevice);
+    if (!createdId) throw new Error('The API created the device but did not return its deviceId.');
+
+    setDevices((currentDevices) => [
+      createdDevice,
+      ...currentDevices.filter((currentDevice) => deviceIdOf(currentDevice) !== createdId),
+    ]);
+    setListError('');
+    setSelectedDeviceId(createdId);
+    setListRetry((current) => current + 1);
+    setNotice(`${createdDevice.name || createdId} registered successfully.`);
+  };
+
+  const displayedDevice = deviceDetailsId === selectedDeviceId ? deviceDetails : null;
+  const showingDetailsLoading = Boolean(selectedDeviceId) && (detailsLoading || deviceDetailsId !== selectedDeviceId);
+
   return (
     <section className="device-management-grid" aria-label="Device management">
-      <DeviceRegistrationForm existingDevices={devices} onRegister={onRegisterDevice} />
-      <DeviceList devices={devices} />
+      <DeviceRegistrationForm existingDevices={devices} onRegister={handleRegisterDevice} />
+      <div className="device-dashboard-column">
+        <DeviceList
+          devices={devices}
+          loading={listLoading}
+          error={listError}
+          selectedDeviceId={selectedDeviceId}
+          onSelect={setSelectedDeviceId}
+          onRetry={() => setListRetry((current) => current + 1)}
+        />
+        <NodeInformationPanel
+          node={asDeviceNode(displayedDevice)}
+          loading={showingDetailsLoading}
+          error={deviceDetailsId === selectedDeviceId ? detailsError : ''}
+          onRetry={() => setDetailsRetry((current) => current + 1)}
+          heading="Device details"
+          emptyHint={listError ? 'Device details will appear when the API is reachable.' : 'Select a device to see its details.'}
+          extendedDeviceDetails
+        />
+      </div>
     </section>
   );
 }
@@ -387,7 +495,6 @@ export default function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const [theme, setTheme] = useState(readSavedTheme);
-  const [devices, setDevices] = useState(readSavedDevices);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -398,22 +505,9 @@ export default function App() {
     }
   }, [theme]);
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem('nexusflow-devices', JSON.stringify(devices));
-    } catch {
-      // Device registration remains usable for this session when storage is unavailable.
-    }
-  }, [devices]);
-
   const handleNavigate = (view) => {
     setActiveView(view);
     setMobileNavOpen(false);
-  };
-
-  const handleRegisterDevice = (device) => {
-    setDevices((currentDevices) => [{ ...device, status: 'Pending', value: '—' }, ...currentDevices]);
-    setNotice(`${device.name} registered and pending connection.`);
   };
 
   const currentPage = activeView === 'Overview' ? null : pageCopy[activeView];
@@ -438,9 +532,9 @@ export default function App() {
             <>
               <section className="page-heading">
                 <div><p className="eyebrow">{currentPage.eyebrow}</p><h1>{currentPage.title}</h1><p className="page-description">{currentPage.description}</p></div>
-                <div className="heading-actions"><div className="system-pill"><span className="system-pulse" /> Simulator sample data</div></div>
+                <div className="heading-actions"><div className="system-pill"><span className="system-pulse" />{activeView === 'Devices' ? 'NexusFlow API' : 'Simulator sample data'}</div></div>
               </section>
-              {activeView === 'Devices' && <DevicesPage devices={devices} onRegisterDevice={handleRegisterDevice} />}
+              {activeView === 'Devices' && <DevicesPage setNotice={setNotice} />}
               {activeView === 'Pipelines' && <PipelineWorkspace setNotice={setNotice} />}
               {activeView === 'Alerts' && <AlertsPage />}
               {activeView === 'Activity' && <ActivityPage />}
