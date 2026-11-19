@@ -1,4 +1,5 @@
 import { telemetryService } from '../services/telemetry.service.js';
+import { AppError } from '../utils/AppError.js';
 
 /**
  * Ingest single or batch telemetry data.
@@ -29,16 +30,12 @@ export function ingestTelemetry(req, res) {
  * Get latest telemetry data for all devices or a single device.
  * GET /api/telemetry/latest or GET /api/telemetry/devices/:deviceId/latest
  */
-export function getLatestTelemetry(req, res) {
+export function getLatestTelemetry(req, res, next) {
   const deviceId = req.params.deviceId || req.query.deviceId;
   const data = telemetryService.getLatest(deviceId);
 
   if (deviceId && !data) {
-    return res.status(404).json({
-      success: false,
-      status: 'fail',
-      message: `No telemetry found for device "${deviceId}"`,
-    });
+    return next(new AppError(`No telemetry found for device "${deviceId}"`, 404));
   }
 
   return res.status(200).json({

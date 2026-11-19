@@ -54,9 +54,6 @@ export function createDevice(req, res, next) {
       data: device,
     });
   } catch (err) {
-    if (err.statusCode === 409) {
-      return next(new AppError(err.message, 409));
-    }
     return next(err);
   }
 }

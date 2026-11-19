@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { AppError } from '../utils/AppError.js';
 
 /**
  * Default demo devices matching the NexusFlow presentation (Slide 08 & Slide 12).
@@ -126,9 +127,7 @@ class DeviceService extends EventEmitter {
     const normalizedId = deviceData.deviceId.toUpperCase().trim();
 
     if (this.devices.has(normalizedId)) {
-      const error = new Error(`Device with ID "${normalizedId}" already exists`);
-      error.statusCode = 409;
-      throw error;
+      throw new AppError(`Device with ID "${normalizedId}" already exists`, 409);
     }
 
     const now = new Date().toISOString();

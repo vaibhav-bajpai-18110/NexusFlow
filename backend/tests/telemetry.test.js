@@ -1,33 +1,15 @@
 import assert from 'node:assert/strict';
-import http from 'node:http';
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
+import app from '../src/app.js';
+import { validateTelemetrySchema } from '../src/models/telemetry.model.js';
+import { telemetryService } from '../src/services/telemetry.service.js';
+import { createTestClient } from './helpers/testClient.js';
 
 process.env.NODE_ENV = 'test';
 
-const { default: app } = await import('../src/app.js');
-const { telemetryService } = await import('../src/services/telemetry.service.js');
-
-let server;
-let baseUrl;
+const client = createTestClient(app);
 
 describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
-  before(async () => {
-    server = http.createServer(app);
-    await new Promise((resolve) => {
-      server.listen(0, '127.0.0.1', () => {
-        const address = server.address();
-        baseUrl = `http://127.0.0.1:${address.port}`;
-        resolve();
-      });
-    });
-  });
-
-  after(async () => {
-    await new Promise((resolve, reject) => {
-      server.close((err) => (err ? reject(err) : resolve()));
-    });
-  });
-
   beforeEach(() => {
     telemetryService.clear();
   });
@@ -40,7 +22,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
       timestamp: '2026-11-12T09:00:00.000Z',
     };
 
-    const response = await fetch(`${baseUrl}/api/telemetry`, {
+    const response = await client('/api/telemetry', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -68,7 +50,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
       vibration: 2.1,
     };
 
-    const response = await fetch(`${baseUrl}/api/telemetry`, {
+    const response = await client('/api/telemetry', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -90,7 +72,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
       temperature: 71,
     };
 
-    const response = await fetch(`${baseUrl}/api/telemetry/ingest`, {
+    const response = await client('/api/telemetry/ingest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -114,7 +96,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
       },
     };
 
-    const response = await fetch(`${baseUrl}/api/telemetry`, {
+    const response = await client('/api/telemetry', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -134,7 +116,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
       { deviceId: 'MOTOR_002', vibration: 2.3 },
     ];
 
-    const response = await fetch(`${baseUrl}/api/telemetry`, {
+    const response = await client('/api/telemetry', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -151,7 +133,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
 
   describe('Validation & Error Handling', () => {
     it('returns 400 when body is empty object', async () => {
-      const response = await fetch(`${baseUrl}/api/telemetry`, {
+      const response = await client('/api/telemetry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: '{}',
@@ -166,7 +148,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
     });
 
     it('returns 400 when deviceId is missing', async () => {
-      const response = await fetch(`${baseUrl}/api/telemetry`, {
+      const response = await client('/api/telemetry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ temperature: 85 }),
@@ -182,7 +164,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
     });
 
     it('returns 400 when deviceId is empty or whitespace', async () => {
-      const response = await fetch(`${baseUrl}/api/telemetry`, {
+      const response = await client('/api/telemetry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId: '   ', temperature: 85 }),
@@ -198,7 +180,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
     });
 
     it('returns 400 when no sensor metrics are provided', async () => {
-      const response = await fetch(`${baseUrl}/api/telemetry`, {
+      const response = await client('/api/telemetry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId: 'TURBINE_001' }),
@@ -214,7 +196,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
     });
 
     it('returns 400 when metric value is not a valid number', async () => {
-      const response = await fetch(`${baseUrl}/api/telemetry`, {
+      const response = await client('/api/telemetry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -233,7 +215,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
     });
 
     it('returns 400 when timestamp format is invalid', async () => {
-      const response = await fetch(`${baseUrl}/api/telemetry`, {
+      const response = await client('/api/telemetry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -258,7 +240,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
         { deviceId: '', temperature: 90 }, // failing item
       ];
 
-      const response = await fetch(`${baseUrl}/api/telemetry`, {
+      const response = await client('/api/telemetry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -275,12 +257,12 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
 
   describe('Query Endpoints (GET /api/telemetry)', () => {
     beforeEach(async () => {
-      await fetch(`${baseUrl}/api/telemetry`, {
+      await client('/api/telemetry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId: 'TURBINE_001', temperature: 85 }),
       });
-      await fetch(`${baseUrl}/api/telemetry`, {
+      await client('/api/telemetry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId: 'MOTOR_002', vibration: 2.1 }),
@@ -288,7 +270,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
     });
 
     it('GET /api/telemetry/latest returns all latest devices', async () => {
-      const response = await fetch(`${baseUrl}/api/telemetry/latest`);
+      const response = await client('/api/telemetry/latest');
       const body = await response.json();
 
       assert.equal(response.status, 200);
@@ -297,7 +279,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
     });
 
     it('GET /api/telemetry/:deviceId returns latest data for specific device', async () => {
-      const response = await fetch(`${baseUrl}/api/telemetry/TURBINE_001`);
+      const response = await client('/api/telemetry/TURBINE_001');
       const body = await response.json();
 
       assert.equal(response.status, 200);
@@ -308,7 +290,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
     });
 
     it('GET /api/telemetry/:deviceId returns 404 for unknown device', async () => {
-      const response = await fetch(`${baseUrl}/api/telemetry/UNKNOWN_DEVICE`);
+      const response = await client('/api/telemetry/UNKNOWN_DEVICE');
       const body = await response.json();
 
       assert.equal(response.status, 404);
@@ -317,7 +299,7 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
     });
 
     it('GET /api/telemetry/history returns recent history and supports limit', async () => {
-      const response = await fetch(`${baseUrl}/api/telemetry/history?limit=1`);
+      const response = await client('/api/telemetry/history?limit=1');
       const body = await response.json();
 
       assert.equal(response.status, 200);
@@ -326,12 +308,28 @@ describe('Telemetry Ingestion API (POST /api/telemetry)', () => {
     });
 
     it('GET /api/telemetry/stats returns accurate statistics', async () => {
-      const response = await fetch(`${baseUrl}/api/telemetry/stats`);
+      const response = await client('/api/telemetry/stats');
       const body = await response.json();
 
       assert.equal(response.status, 200);
       assert.equal(body.data.totalEventsReceived, 2);
       assert.equal(body.data.activeDevicesCount, 2);
+    });
+  });
+
+  describe('Telemetry Model Schema Verification', () => {
+    it('validates telemetry object against Telemetry schema specification', () => {
+      const valid = {
+        deviceId: 'TURBINE_001',
+        timestamp: new Date().toISOString(),
+        metrics: { temperature: 85 },
+      };
+      const errors = validateTelemetrySchema(valid);
+      assert.equal(errors.length, 0);
+
+      const invalid = { deviceId: '', timestamp: 'bad' };
+      const invalidErrors = validateTelemetrySchema(invalid);
+      assert.ok(invalidErrors.length >= 2);
     });
   });
 });
