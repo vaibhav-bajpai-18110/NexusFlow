@@ -13,16 +13,6 @@ import {
   Thermometer,
   Workflow,
 } from 'lucide-react';
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import Sidebar from './components/Sidebar.jsx';
 import Navbar from './components/Navbar.jsx';
 import MetricCard from './components/MetricCard.jsx';
@@ -30,6 +20,7 @@ import WorkflowCanvas from './components/WorkflowCanvas.jsx';
 import NodeInformationPanel from './components/NodeInformationPanel.jsx';
 import DeviceRegistrationForm from './components/DeviceRegistrationForm.jsx';
 import DeviceList from './components/DeviceList.jsx';
+import TelemetryPanel from './components/TelemetryPanel.jsx';
 import { fetchDevice, fetchDevices, registerDevice } from './services/deviceApi.js';
 
 const pageCopy = {
@@ -103,19 +94,6 @@ const events = [
   },
 ];
 
-const telemetry = [
-  { time: '09:00', temperature: 71 },
-  { time: '09:20', temperature: 73 },
-  { time: '09:40', temperature: 72 },
-  { time: '10:00', temperature: 75 },
-  { time: '10:20', temperature: 76 },
-  { time: '10:40', temperature: 74 },
-  { time: '11:00', temperature: 77 },
-  { time: '11:20', temperature: 79 },
-  { time: '11:40', temperature: 82 },
-  { time: '12:00', temperature: 85 },
-];
-
 const alerts = [
   { level: 'Critical', device: 'Turbine 01', message: 'Temperature above threshold', value: '85°C', tone: 'critical' },
   { level: 'Warning', device: 'Motor 02', message: 'Vibration approaching limit', value: '2.1 mm/s', tone: 'warning' },
@@ -128,16 +106,6 @@ function readSavedTheme() {
   } catch {
     return 'dark';
   }
-}
-
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="chart-tooltip">
-      <span>{label}</span>
-      <strong>{payload[0].value}°C</strong>
-    </div>
-  );
 }
 
 function EventList({ compact = false }) {
@@ -160,7 +128,7 @@ function EventList({ compact = false }) {
   );
 }
 
-function Overview({ onOpenPipelines, onOpenActivity }) {
+function Overview({ onOpenPipelines, onOpenActivity, onOpenDevices }) {
   return (
     <>
       <section className="page-heading">
@@ -170,7 +138,7 @@ function Overview({ onOpenPipelines, onOpenActivity }) {
           <p className="page-description">Monitor device health, temperature telemetry, and active pipelines.</p>
         </div>
         <div className="heading-actions">
-          <div className="system-pill"><span className="system-pulse" /> Simulator sample data</div>
+          <div className="system-pill"><span className="system-pulse" /> Telemetry · NexusFlow API</div>
           <button className="button button-primary" onClick={onOpenPipelines}>
             <Plus size={16} strokeWidth={2.4} /> New pipeline
           </button>
@@ -182,41 +150,7 @@ function Overview({ onOpenPipelines, onOpenActivity }) {
       </section>
 
       <section className="dashboard-grid">
-        <div className="panel chart-panel">
-          <div className="panel-heading">
-            <div>
-              <div className="panel-title-row">
-                <h2>Temperature telemetry</h2>
-                <span className="live-tag"><span /> Simulator</span>
-              </div>
-              <p>Turbine 01 · illustrative readings</p>
-            </div>
-            <div className="chart-current"><span>Current sample</span><strong>85°C</strong></div>
-          </div>
-          <div className="chart-key">
-            <span className="threshold-key"><i /> Threshold · 80°C</span>
-            <span>Average window · 5 readings</span>
-          </div>
-          <div className="telemetry-chart">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={telemetry} margin={{ top: 15, right: 18, left: -18, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="temperature-fill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#8da2ff" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#8da2ff" stopOpacity={0.01} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="4 5" vertical={false} />
-                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-label)', fontSize: 9 }} dy={8} />
-                <YAxis domain={[65, 90]} ticks={[70, 80, 90]} tickFormatter={(value) => value + '°'} axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-label)', fontSize: 9 }} />
-                <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#607196', strokeDasharray: '3 4' }} />
-                <ReferenceLine y={80} stroke="#e8b86b" strokeDasharray="5 5" />
-                <Area type="monotone" dataKey="temperature" stroke="#91a4ff" strokeWidth={2} fill="url(#temperature-fill)" activeDot={{ r: 4, fill: '#c6d0ff', stroke: '#5368bb', strokeWidth: 2 }} isAnimationActive={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="chart-footnote"><span className="demo-dot" /> Demo values only · actual readings and thresholds are configurable.</div>
-        </div>
+        <TelemetryPanel onOpenDevices={onOpenDevices} />
 
         <div className="panel activity-panel">
           <div className="panel-heading activity-heading">
@@ -527,7 +461,11 @@ export default function App() {
 
         <main className="page-content">
           {activeView === 'Overview' ? (
-            <Overview onOpenPipelines={() => handleNavigate('Pipelines')} onOpenActivity={() => handleNavigate('Activity')} />
+            <Overview
+              onOpenPipelines={() => handleNavigate('Pipelines')}
+              onOpenActivity={() => handleNavigate('Activity')}
+              onOpenDevices={() => handleNavigate('Devices')}
+            />
           ) : (
             <>
               <section className="page-heading">
