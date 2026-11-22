@@ -6,6 +6,7 @@ import {
   Cpu,
   Hexagon,
   LayoutDashboard,
+  SlidersHorizontal,
   Settings2,
   Workflow,
 } from 'lucide-react';
@@ -13,6 +14,7 @@ import {
 const primaryLinks = [
   { label: 'Overview', icon: LayoutDashboard },
   { label: 'Devices', icon: Cpu, count: '24' },
+  { label: 'Rules', icon: SlidersHorizontal },
   { label: 'Pipelines', icon: Workflow, count: '08' },
   { label: 'Alerts', icon: Bell, count: '03' },
   { label: 'Activity', icon: Activity },

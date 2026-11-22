@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Activity, Droplets, Gauge, MapPin, Radio, RefreshCw, Thermometer } from 'lucide-react';
 import { fetchDevices } from '../services/deviceApi.js';
+import { fetchLatestTelemetry } from '../services/telemetryApi.js';
+import TelemetryHistory from './TelemetryHistory.jsx';
 import './TelemetryPanel.css';
 
 function deviceIdOf(device) {
@@ -11,7 +13,7 @@ function deviceTypeOf(device) {
   return device?.type || device?.deviceType || 'Sensor';
 }
 
-function readingOf(device) {
+function fallbackReadingOf(device) {
   const value = device?.lastValue ?? device?.latestValue ?? device?.value;
   if (value && typeof value === 'object') {
     return value.value ?? value.reading ?? value.temperature ?? value.humidity ?? '—';
@@ -22,6 +24,23 @@ function readingOf(device) {
 function unitOf(device) {
   const reading = device?.lastValue ?? device?.latestValue ?? device?.value;
   return device?.unit || device?.readingUnit || (reading && typeof reading === 'object' ? reading.unit : '') || '';
+}
+
+function metricReadingsOf(device) {
+  const metrics = device?.latestTelemetry?.metrics || device?.lastMetrics;
+  if (metrics && typeof metrics === 'object' && !Array.isArray(metrics)) {
+    const readings = Object.entries(metrics)
+      .filter(([, value]) => value !== null && value !== undefined && Number.isFinite(Number(value)))
+      .map(([metric, value]) => ({ metric, value }));
+    if (readings.length) return readings;
+  }
+
+  const fallback = fallbackReadingOf(device);
+  return fallback === '—' ? [] : [{ metric: 'Latest reading', value: fallback, unit: unitOf(device) }];
+}
+
+function metricLabel(value) {
+  return value.replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function locationOf(device) {
@@ -68,16 +87,17 @@ function TelemetrySkeleton() {
   );
 }
 
-function TelemetryDeviceCard({ device }) {
+function TelemetryDeviceCard({ device, selected, onSelect }) {
   const type = deviceTypeOf(device);
   const Icon = iconFor(type);
   const deviceId = deviceIdOf(device);
   const status = String(device?.status || 'unknown');
-  const latestReading = readingOf(device);
-  const unit = unitOf(device);
+  const readings = metricReadingsOf(device);
+  const primaryReading = readings[0];
+  const unit = primaryReading?.unit || (readings.length === 1 ? unitOf(device) : '');
 
   return (
-    <article className="telemetry-device-card">
+    <button className={`telemetry-device-card${selected ? ' telemetry-device-card-selected' : ''}`} type="button" onClick={onSelect} aria-pressed={selected}>
       <div className="telemetry-device-topline">
         <span className="telemetry-device-icon"><Icon size={16} aria-hidden="true" /></span>
         <span className="telemetry-device-type">{type}</span>
@@ -90,42 +110,86 @@ function TelemetryDeviceCard({ device }) {
         <code>{deviceId || 'No device ID'}</code>
       </div>
       <div className="telemetry-reading-value">
-        <span>Latest reading</span>
-        <strong>{latestReading}</strong>
+        <span>{primaryReading ? metricLabel(primaryReading.metric) : 'Latest reading'}</span>
+        <strong>{primaryReading?.value ?? '—'}</strong>
         {unit && <small>{unit}</small>}
       </div>
+      {readings.length > 1 && (
+        <div className="telemetry-extra-readings">
+          {readings.slice(1).map((reading) => <span key={reading.metric}>{metricLabel(reading.metric)} <strong>{reading.value}</strong></span>)}
+        </div>
+      )}
       <div className="telemetry-device-footer">
         <span className="telemetry-location"><MapPin size={12} aria-hidden="true" />{locationOf(device)}</span>
         <time dateTime={device?.lastSeen || undefined}>{formatTime(device?.lastSeen)}</time>
       </div>
-    </article>
+    </button>
   );
 }
 
 export default function TelemetryPanel({ onOpenDevices }) {
   const [devices, setDevices] = useState([]);
+  const [latestTelemetry, setLatestTelemetry] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [telemetryError, setTelemetryError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [selectedDeviceId, setSelectedDeviceId] = useState('');
+
+  const devicesWithLatest = useMemo(() => {
+    const latestByDevice = new Map(latestTelemetry.map((record) => [String(record.deviceId || '').toUpperCase(), record]));
+    return devices.map((device) => {
+      const latest = latestByDevice.get(String(deviceIdOf(device)).toUpperCase());
+      return {
+        ...device,
+        latestTelemetry: latest,
+        lastMetrics: device.lastMetrics || latest?.metrics,
+        lastValue: device.lastValue ?? latest?.lastValue,
+        status: latest?.status || device.status,
+        lastSeen: device.lastSeen || latest?.lastSeen || latest?.lastTimestamp || latest?.timestamp || latest?.receivedAt,
+      };
+    });
+  }, [devices, latestTelemetry]);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError('');
+    setTelemetryError('');
 
-    fetchDevices({ signal: controller.signal })
-      .then(setDevices)
-      .catch((requestError) => {
-        if (requestError.name === 'AbortError') return;
+    Promise.allSettled([
+      fetchDevices({ signal: controller.signal }),
+      fetchLatestTelemetry({ signal: controller.signal }),
+    ]).then(([deviceResult, telemetryResult]) => {
+      if (controller.signal.aborted) return;
+      if (deviceResult.status === 'rejected') {
         setDevices([]);
-        setError(requestError.message || 'Telemetry could not be loaded.');
+        setError(deviceResult.reason.message || 'Devices could not be loaded.');
+      } else {
+        setDevices(deviceResult.value);
+      }
+      if (telemetryResult.status === 'rejected') {
+        setLatestTelemetry([]);
+        setTelemetryError(telemetryResult.reason.message || 'Latest sensor values could not be loaded.');
+      } else {
+        setLatestTelemetry(telemetryResult.value);
+      }
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
       })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
 
     return () => controller.abort();
   }, [reloadKey]);
+
+  useEffect(() => {
+    setSelectedDeviceId((current) => (
+      current && devicesWithLatest.some((device) => deviceIdOf(device) === current)
+        ? current
+        : deviceIdOf(devicesWithLatest[0])
+    ));
+  }, [devicesWithLatest]);
+
+  const selectedDevice = devicesWithLatest.find((device) => deviceIdOf(device) === selectedDeviceId);
 
   return (
     <section className="panel telemetry-panel" aria-labelledby="telemetry-panel-heading" aria-busy={loading}>
@@ -135,7 +199,7 @@ export default function TelemetryPanel({ onOpenDevices }) {
             <h2 id="telemetry-panel-heading">Live telemetry</h2>
             <span className="telemetry-api-badge"><i aria-hidden="true" /> API</span>
           </div>
-          <p>{loading ? 'Loading device readings…' : `${devices.length} ${devices.length === 1 ? 'device' : 'devices'} · latest reported values`}</p>
+          <p>{loading ? 'Loading device readings…' : `${devicesWithLatest.length} ${devicesWithLatest.length === 1 ? 'device' : 'devices'} · latest reported values`}</p>
         </div>
         <button
           className="telemetry-refresh"
@@ -160,11 +224,22 @@ export default function TelemetryPanel({ onOpenDevices }) {
       ) : devices.length ? (
         <>
           <div className="telemetry-reading-grid">
-            {devices.map((device, index) => (
-              <TelemetryDeviceCard device={device} key={deviceIdOf(device) || `${device.name || 'device'}-${index}`} />
+            {devicesWithLatest.map((device, index) => (
+              <TelemetryDeviceCard
+                device={device}
+                key={deviceIdOf(device) || `${device.name || 'device'}-${index}`}
+                selected={deviceIdOf(device) === selectedDeviceId}
+                onSelect={() => setSelectedDeviceId(deviceIdOf(device))}
+              />
             ))}
           </div>
-          <p className="telemetry-panel-footnote">Current snapshot from the device API. Historical readings are not included in this response.</p>
+          {telemetryError && <p className="telemetry-panel-warning" role="status">Latest sensor values could not be refreshed: {telemetryError}</p>}
+          <TelemetryHistory
+            deviceId={selectedDeviceId}
+            deviceName={selectedDevice?.name || selectedDeviceId}
+            unit={selectedDevice?.unit || ''}
+          />
+          <p className="telemetry-panel-footnote">Current values and recent history are loaded from the NexusFlow telemetry API.</p>
         </>
       ) : (
         <div className="telemetry-state telemetry-empty">

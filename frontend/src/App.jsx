@@ -9,6 +9,7 @@ import {
   Plus,
   Radio,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
   Thermometer,
   Workflow,
@@ -21,6 +22,7 @@ import NodeInformationPanel from './components/NodeInformationPanel.jsx';
 import DeviceRegistrationForm from './components/DeviceRegistrationForm.jsx';
 import DeviceList from './components/DeviceList.jsx';
 import TelemetryPanel from './components/TelemetryPanel.jsx';
+import RuleManagement from './components/RuleManagement.jsx';
 import { fetchDevice, fetchDevices, registerDevice } from './services/deviceApi.js';
 
 const pageCopy = {
@@ -29,6 +31,12 @@ const pageCopy = {
     title: 'Device Management',
     description: 'Register devices and review their IDs, types, and connection status.',
     icon: Cpu,
+  },
+  Rules: {
+    eyebrow: 'Automation',
+    title: 'Rules Management',
+    description: 'Create threshold rules to monitor device metrics.',
+    icon: SlidersHorizontal,
   },
   Pipelines: {
     eyebrow: 'Visual editor',
@@ -314,6 +322,43 @@ function DevicesPage({ setNotice }) {
   );
 }
 
+function RulesPage() {
+  const [devices, setDevices] = useState([]);
+  const [devicesLoading, setDevicesLoading] = useState(true);
+  const [devicesError, setDevicesError] = useState('');
+  const [devicesRetry, setDevicesRetry] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setDevicesLoading(true);
+    setDevicesError('');
+
+    fetchDevices({ signal: controller.signal })
+      .then(setDevices)
+      .catch((error) => {
+        if (error.name === 'AbortError') return;
+        setDevices([]);
+        setDevicesError(error.message || 'Device options could not be loaded.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDevicesLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [devicesRetry]);
+
+  return (
+    <RuleManagement
+      devices={devices}
+      devicesLoading={devicesLoading}
+      devicesError={devicesError}
+      onRetryDevices={() => setDevicesRetry((current) => current + 1)}
+      rules={[]}
+      rulesApiAvailable={false}
+    />
+  );
+}
+
 function AlertsPage() {
   return (
     <section className="panel data-panel">
@@ -470,9 +515,10 @@ export default function App() {
             <>
               <section className="page-heading">
                 <div><p className="eyebrow">{currentPage.eyebrow}</p><h1>{currentPage.title}</h1><p className="page-description">{currentPage.description}</p></div>
-                <div className="heading-actions"><div className="system-pill"><span className="system-pulse" />{activeView === 'Devices' ? 'NexusFlow API' : 'Simulator sample data'}</div></div>
+                <div className="heading-actions"><div className="system-pill"><span className="system-pulse" />{activeView === 'Devices' ? 'NexusFlow API' : activeView === 'Rules' ? 'API connection pending' : 'Simulator sample data'}</div></div>
               </section>
               {activeView === 'Devices' && <DevicesPage setNotice={setNotice} />}
+              {activeView === 'Rules' && <RulesPage />}
               {activeView === 'Pipelines' && <PipelineWorkspace setNotice={setNotice} />}
               {activeView === 'Alerts' && <AlertsPage />}
               {activeView === 'Activity' && <ActivityPage />}
