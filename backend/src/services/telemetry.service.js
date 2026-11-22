@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { env } from '../config/env.js';
 import { deviceService } from './device.service.js';
+import { ruleService } from './rule.service.js';
 
 class TelemetryService extends EventEmitter {
   constructor(maxHistory = env?.maxTelemetryBuffer || 1000) {
@@ -48,6 +49,13 @@ class TelemetryService extends EventEmitter {
       deviceService.recordTelemetry(record);
     } catch (err) {
       console.error('[TelemetryService] Failed to update device registry for record:', err);
+    }
+
+    // Evaluate active rules against incoming telemetry record
+    try {
+      ruleService.evaluateAll(record);
+    } catch (err) {
+      console.error('[TelemetryService] Failed to evaluate rules for record:', err);
     }
 
     // Emit event for real-time subscribers (RxJS rule engine, WebSockets)
