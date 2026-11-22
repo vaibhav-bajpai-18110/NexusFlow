@@ -1,4 +1,5 @@
 import { ruleService } from '../services/rule.service.js';
+import { ruleEvaluationService } from '../services/ruleEvaluation.service.js';
 import { AppError } from '../utils/AppError.js';
 
 /**
@@ -135,5 +136,63 @@ export function testRule(req, res, next) {
       ? `Condition met: rule action "${result.action?.type}" triggered`
       : 'Condition not met',
     data: result,
+  });
+}
+
+/**
+ * Retrieve recent alerts emitted by the rule evaluation engine.
+ * GET /api/rules/alerts
+ */
+export function getRuleAlerts(req, res) {
+  const { deviceId, ruleId, severity, limit } = req.query;
+  const alerts = ruleEvaluationService.getAlerts({
+    deviceId,
+    ruleId,
+    severity,
+    limit,
+  });
+
+  return res.status(200).json({
+    success: true,
+    status: 'ok',
+    count: alerts.length,
+    data: alerts,
+    stats: ruleEvaluationService.getStats(),
+  });
+}
+
+/**
+ * Evaluates telemetry payload against saved rules or provided rules.
+ * POST /api/rules/evaluate
+ */
+export function evaluateTelemetryRules(req, res, next) {
+  const telemetryData = req.body.telemetry || req.body.data || req.body;
+  if (!telemetryData || !telemetryData.deviceId) {
+    return next(
+      new AppError('Telemetry object with deviceId is required for evaluation', 400, [
+        { field: 'deviceId', message: 'telemetry payload must contain a valid deviceId' },
+      ])
+    );
+  }
+
+  const results = ruleEvaluationService.evaluateTelemetry(
+    telemetryData,
+    req.body.rules
+  );
+
+  const matched = results.filter((r) => r.matched);
+  const unmatched = results.filter((r) => !r.matched);
+
+  return res.status(200).json({
+    success: true,
+    status: 'ok',
+    totalRulesEvaluated: results.length,
+    matchedCount: matched.length,
+    unmatchedCount: unmatched.length,
+    data: {
+      matched,
+      unmatched,
+      all: results,
+    },
   });
 }

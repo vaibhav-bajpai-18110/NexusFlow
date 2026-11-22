@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import { env } from '../config/env.js';
 import { deviceService } from './device.service.js';
 import { ruleService } from './rule.service.js';
+import { ruleEvaluationService } from './ruleEvaluation.service.js';
 
 class TelemetryService extends EventEmitter {
   constructor(maxHistory = env?.maxTelemetryBuffer || 1000) {
@@ -56,6 +57,13 @@ class TelemetryService extends EventEmitter {
       ruleService.evaluateAll(record);
     } catch (err) {
       console.error('[TelemetryService] Failed to evaluate rules for record:', err);
+    }
+
+    // Process telemetry through RxJS reactive rule evaluation engine
+    try {
+      ruleEvaluationService.processTelemetry(record);
+    } catch (err) {
+      console.error('[TelemetryService] Failed to process telemetry in RxJS engine:', err);
     }
 
     // Emit event for real-time subscribers (RxJS rule engine, WebSockets)
