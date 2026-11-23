@@ -1,40 +1,35 @@
 import http from 'node:http';
 import app from './app.js';
 import { env } from './config/env.js';
-import { connectDB, disconnectDB } from './config/db.js';
-import { initializePersistence } from './services/persistence.service.js';
 
 const server = http.createServer(app);
 
-async function startServer() {
-  try {
-    await connectDB();
-    await initializePersistence();
-
-    server.listen(env.port, () => {
-      console.log(`${env.serviceName} running on port ${env.port}`);
-    });
-  } catch (error) {
-    console.error('Server startup failed:', error.message);
-    process.exit(1);
-  }
-}
-
-async function shutdown(signal) {
-  console.log(`${signal} received. Shutting down...`);
-
-  server.close(async () => {
-    try {
-      await disconnectDB();
-      process.exit(0);
-    } catch (error) {
-      console.error('Shutdown error:', error.message);
+function shutdown(signal) {
+  console.log(`\nReceived ${signal}. Shutting down ${env.serviceName} gracefully...`);
+  server.close((err) => {
+    if (err) {
+      console.error('Error while closing HTTP server:', err);
       process.exit(1);
     }
+    console.log('HTTP server closed.');
+    process.exit(0);
   });
 }
+
+server.listen(env.port, () => {
+  console.log(
+    `[${env.serviceName}] listening on http://localhost:${env.port} (${env.nodeEnv})`
+  );
+});
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-startServer();
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Promise Rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
+});

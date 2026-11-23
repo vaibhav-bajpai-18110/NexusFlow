@@ -32,8 +32,6 @@ export const env = Object.freeze({
   serviceName: process.env.SERVICE_NAME || 'nexusflow-backend',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   maxTelemetryBuffer: parseNumber(process.env.MAX_TELEMETRY_BUFFER, 1000),
-  mongoUri: process.env.MONGODB_URI || '',
   isProduction: nodeEnv === 'production',
   isTest: nodeEnv === 'test',
 });
-

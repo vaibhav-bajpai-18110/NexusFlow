@@ -1,6 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { env } from '../config/env.js';
 import { deviceService } from './device.service.js';
+import { ruleService } from './rule.service.js';
+import { ruleEvaluationService } from './ruleEvaluation.service.js';
 
 class TelemetryService extends EventEmitter {
   constructor(maxHistory = env?.maxTelemetryBuffer || 1000) {
@@ -50,6 +52,20 @@ class TelemetryService extends EventEmitter {
       console.error('[TelemetryService] Failed to update device registry for record:', err);
     }
 
+    // Evaluate active rules against incoming telemetry record
+    try {
+      ruleService.evaluateAll(record);
+    } catch (err) {
+      console.error('[TelemetryService] Failed to evaluate rules for record:', err);
+    }
+
+    // Process telemetry through RxJS reactive rule evaluation engine
+    try {
+      ruleEvaluationService.processTelemetry(record);
+    } catch (err) {
+      console.error('[TelemetryService] Failed to process telemetry in RxJS engine:', err);
+    }
+
     // Emit event for real-time subscribers (RxJS rule engine, WebSockets)
     this.emit('telemetry', record);
 
@@ -77,21 +93,74 @@ class TelemetryService extends EventEmitter {
   }
 
   /**
-   * Returns recent telemetry history with optional filters.
+   * Returns recent telemetry history with optional filters and pagination.
+   * Supports: deviceId, startDate/from, endDate/to, metric, sort, limit, page.
    * @param {object} [options]
    * @param {string} [options.deviceId]
+   * @param {string} [options.startDate]
+   * @param {string} [options.endDate]
+   * @param {string} [options.metric]
+   * @param {string} [options.sort='desc']
    * @param {number} [options.limit=50]
+   * @param {number} [options.page=1]
    */
   getHistory(options = {}) {
-    const { deviceId, limit = 50 } = options;
-    const effectiveLimit = Math.min(Math.max(1, Number(limit) || 50), this.maxHistory);
+    const {
+      deviceId,
+      startDate,
+      endDate,
+      metric,
+      sort = 'desc',
+      limit = 50,
+      page = 1,
+    } = options;
 
-    let list = this.history;
+    const effectiveLimit = Math.min(Math.max(1, Number(limit) || 50), this.maxHistory);
+    const effectivePage = Math.max(1, Number(page) || 1);
+
+    let list = [...this.history];
+
     if (deviceId) {
-      list = list.filter((r) => r.deviceId.toLowerCase() === deviceId.toLowerCase());
+      const targetId = deviceId.toUpperCase().trim();
+      list = list.filter((r) => r.deviceId.toUpperCase().trim() === targetId);
     }
 
-    return list.slice(-effectiveLimit).reverse();
+    if (startDate) {
+      const startMs = new Date(startDate).getTime();
+      list = list.filter((r) => new Date(r.timestamp).getTime() >= startMs);
+    }
+
+    if (endDate) {
+      const endMs = new Date(endDate).getTime();
+      list = list.filter((r) => new Date(r.timestamp).getTime() <= endMs);
+    }
+
+    if (metric) {
+      const m = metric.trim();
+      list = list.filter(
+        (r) =>
+          (r.metrics && r.metrics[m] !== undefined) ||
+          r[m] !== undefined
+      );
+    }
+
+    if (sort === 'asc') {
+      list.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    } else {
+      list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    }
+
+    const total = list.length;
+    const startIndex = (effectivePage - 1) * effectiveLimit;
+    const paginatedRecords = list.slice(startIndex, startIndex + effectiveLimit);
+
+    return {
+      total,
+      page: effectivePage,
+      limit: effectiveLimit,
+      totalPages: Math.ceil(total / effectiveLimit) || 1,
+      records: paginatedRecords,
+    };
   }
 
   /**

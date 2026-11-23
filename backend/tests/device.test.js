@@ -1,34 +1,16 @@
 import assert from 'node:assert/strict';
-import http from 'node:http';
-import { after, before, beforeEach, describe, it } from 'node:test';
+import { beforeEach, describe, it } from 'node:test';
+import app from '../src/app.js';
+import { validateDeviceSchema } from '../src/models/device.model.js';
+import { deviceService } from '../src/services/device.service.js';
+import { telemetryService } from '../src/services/telemetry.service.js';
+import { createTestClient } from './helpers/testClient.js';
 
 process.env.NODE_ENV = 'test';
 
-const { default: app } = await import('../src/app.js');
-const { deviceService } = await import('../src/services/device.service.js');
-const { telemetryService } = await import('../src/services/telemetry.service.js');
-
-let server;
-let baseUrl;
+const client = createTestClient(app);
 
 describe('Device Registry API (/api/devices)', () => {
-  before(async () => {
-    server = http.createServer(app);
-    await new Promise((resolve) => {
-      server.listen(0, '127.0.0.1', () => {
-        const address = server.address();
-        baseUrl = `http://127.0.0.1:${address.port}`;
-        resolve();
-      });
-    });
-  });
-
-  after(async () => {
-    await new Promise((resolve, reject) => {
-      server.close((err) => (err ? reject(err) : resolve()));
-    });
-  });
-
   beforeEach(() => {
     deviceService.resetToDefaults();
     telemetryService.clear();
@@ -36,7 +18,7 @@ describe('Device Registry API (/api/devices)', () => {
 
   describe('GET /api/devices', () => {
     it('returns default seeded demo devices', async () => {
-      const response = await fetch(`${baseUrl}/api/devices`);
+      const response = await client('/api/devices');
       const body = await response.json();
 
       assert.equal(response.status, 200);
@@ -54,7 +36,7 @@ describe('Device Registry API (/api/devices)', () => {
     });
 
     it('filters devices by status=offline', async () => {
-      const response = await fetch(`${baseUrl}/api/devices?status=offline`);
+      const response = await client('/api/devices?status=offline');
       const body = await response.json();
 
       assert.equal(response.status, 200);
@@ -64,7 +46,7 @@ describe('Device Registry API (/api/devices)', () => {
     });
 
     it('filters devices by status=online', async () => {
-      const response = await fetch(`${baseUrl}/api/devices?status=online`);
+      const response = await client('/api/devices?status=online');
       const body = await response.json();
 
       assert.equal(response.status, 200);
@@ -75,7 +57,7 @@ describe('Device Registry API (/api/devices)', () => {
     });
 
     it('filters devices by type=Vibration', async () => {
-      const response = await fetch(`${baseUrl}/api/devices?type=Vibration`);
+      const response = await client('/api/devices?type=Vibration');
       const body = await response.json();
 
       assert.equal(response.status, 200);
@@ -84,7 +66,7 @@ describe('Device Registry API (/api/devices)', () => {
     });
 
     it('searches devices by text query', async () => {
-      const response = await fetch(`${baseUrl}/api/devices?search=boiler`);
+      const response = await client('/api/devices?search=boiler');
       const body = await response.json();
 
       assert.equal(response.status, 200);
@@ -95,7 +77,7 @@ describe('Device Registry API (/api/devices)', () => {
 
   describe('GET /api/devices/stats', () => {
     it('returns accurate device count and status statistics', async () => {
-      const response = await fetch(`${baseUrl}/api/devices/stats`);
+      const response = await client('/api/devices/stats');
       const body = await response.json();
 
       assert.equal(response.status, 200);
@@ -111,7 +93,7 @@ describe('Device Registry API (/api/devices)', () => {
 
   describe('GET /api/devices/:id', () => {
     it('returns specific device by deviceId (case-insensitive)', async () => {
-      const response = await fetch(`${baseUrl}/api/devices/turbine_001`);
+      const response = await client('/api/devices/turbine_001');
       const body = await response.json();
 
       assert.equal(response.status, 200);
@@ -121,7 +103,7 @@ describe('Device Registry API (/api/devices)', () => {
     });
 
     it('returns 404 for unknown deviceId', async () => {
-      const response = await fetch(`${baseUrl}/api/devices/NON_EXISTENT_999`);
+      const response = await client('/api/devices/NON_EXISTENT_999');
       const body = await response.json();
 
       assert.equal(response.status, 404);
@@ -141,7 +123,7 @@ describe('Device Registry API (/api/devices)', () => {
         description: 'Centrifugal liquid chiller unit',
       };
 
-      const response = await fetch(`${baseUrl}/api/devices`, {
+      const response = await client('/api/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newDevice),
@@ -159,7 +141,7 @@ describe('Device Registry API (/api/devices)', () => {
     });
 
     it('returns 400 when deviceId is missing', async () => {
-      const response = await fetch(`${baseUrl}/api/devices`, {
+      const response = await client('/api/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'Device without ID' }),
@@ -175,7 +157,7 @@ describe('Device Registry API (/api/devices)', () => {
     });
 
     it('returns 400 when deviceId has invalid characters', async () => {
-      const response = await fetch(`${baseUrl}/api/devices`, {
+      const response = await client('/api/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId: 'invalid ID with spaces!' }),
@@ -190,7 +172,7 @@ describe('Device Registry API (/api/devices)', () => {
     });
 
     it('returns 400 when status is invalid', async () => {
-      const response = await fetch(`${baseUrl}/api/devices`, {
+      const response = await client('/api/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId: 'VALID_ID', status: 'destroyed' }),
@@ -205,7 +187,7 @@ describe('Device Registry API (/api/devices)', () => {
     });
 
     it('returns 409 Conflict when deviceId already exists', async () => {
-      const response = await fetch(`${baseUrl}/api/devices`, {
+      const response = await client('/api/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId: 'TURBINE_001', name: 'Duplicate Turbine' }),
@@ -221,7 +203,7 @@ describe('Device Registry API (/api/devices)', () => {
 
   describe('PUT /api/devices/:id (Update)', () => {
     it('updates device metadata successfully', async () => {
-      const response = await fetch(`${baseUrl}/api/devices/TURBINE_001`, {
+      const response = await client('/api/devices/TURBINE_001', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -240,8 +222,22 @@ describe('Device Registry API (/api/devices)', () => {
       assert.equal(body.data.status, 'maintenance');
     });
 
+    it('returns 400 when trying to modify immutable deviceId', async () => {
+      const response = await client('/api/devices/TURBINE_001', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId: 'NEW_TURBINE_ID' }),
+      });
+
+      const body = await response.json();
+
+      assert.equal(response.status, 400);
+      assert.equal(body.success, false);
+      assert.match(body.message, /Validation failed/);
+    });
+
     it('returns 404 when updating non-existent device', async () => {
-      const response = await fetch(`${baseUrl}/api/devices/DOES_NOT_EXIST`, {
+      const response = await client('/api/devices/DOES_NOT_EXIST', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'New Name' }),
@@ -256,7 +252,7 @@ describe('Device Registry API (/api/devices)', () => {
 
   describe('DELETE /api/devices/:id', () => {
     it('deletes device and prevents subsequent lookups', async () => {
-      const delResponse = await fetch(`${baseUrl}/api/devices/MOTOR_002`, {
+      const delResponse = await client('/api/devices/MOTOR_002', {
         method: 'DELETE',
       });
       const delBody = await delResponse.json();
@@ -265,12 +261,12 @@ describe('Device Registry API (/api/devices)', () => {
       assert.equal(delBody.success, true);
       assert.match(delBody.message, /deleted successfully/);
 
-      const getResponse = await fetch(`${baseUrl}/api/devices/MOTOR_002`);
+      const getResponse = await client('/api/devices/MOTOR_002');
       assert.equal(getResponse.status, 404);
     });
 
     it('returns 404 when deleting non-existent device', async () => {
-      const response = await fetch(`${baseUrl}/api/devices/DOES_NOT_EXIST`, {
+      const response = await client('/api/devices/DOES_NOT_EXIST', {
         method: 'DELETE',
       });
       assert.equal(response.status, 404);
@@ -280,13 +276,13 @@ describe('Device Registry API (/api/devices)', () => {
   describe('Telemetry-to-Device Live Integration', () => {
     it('transitions offline device to online and updates lastValue when telemetry arrives', async () => {
       // 1. Verify PUMP_003 is offline initially
-      const initialGet = await fetch(`${baseUrl}/api/devices/PUMP_003`);
+      const initialGet = await client('/api/devices/PUMP_003');
       const initialBody = await initialGet.json();
       assert.equal(initialBody.data.status, 'offline');
       assert.equal(initialBody.data.lastValue, null);
 
       // 2. Ingest telemetry for PUMP_003
-      const telemetryResponse = await fetch(`${baseUrl}/api/telemetry`, {
+      const telemetryResponse = await client('/api/telemetry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -297,7 +293,7 @@ describe('Device Registry API (/api/devices)', () => {
       assert.equal(telemetryResponse.status, 201);
 
       // 3. Verify device status transitioned to online with updated lastValue
-      const updatedGet = await fetch(`${baseUrl}/api/devices/PUMP_003`);
+      const updatedGet = await client('/api/devices/PUMP_003');
       const updatedBody = await updatedGet.json();
 
       assert.equal(updatedBody.data.status, 'online');
@@ -306,7 +302,7 @@ describe('Device Registry API (/api/devices)', () => {
     });
 
     it('auto-discovers and registers a brand new device on telemetry ingestion', async () => {
-      const response = await fetch(`${baseUrl}/api/telemetry`, {
+      const response = await client('/api/telemetry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -317,13 +313,25 @@ describe('Device Registry API (/api/devices)', () => {
       assert.equal(response.status, 201);
 
       // Check device registry
-      const devResponse = await fetch(`${baseUrl}/api/devices/ROBOT_ARM_10`);
+      const devResponse = await client('/api/devices/ROBOT_ARM_10');
       const devBody = await devResponse.json();
 
       assert.equal(devResponse.status, 200);
       assert.equal(devBody.data.deviceId, 'ROBOT_ARM_10');
       assert.equal(devBody.data.status, 'online');
       assert.equal(devBody.data.lastValue, 1.45);
+    });
+  });
+
+  describe('Device Model Schema Verification', () => {
+    it('validates device object against Device schema specification', () => {
+      const valid = { deviceId: 'TURBINE_001', name: 'Turbine 01', status: 'online' };
+      const errors = validateDeviceSchema(valid);
+      assert.equal(errors.length, 0);
+
+      const invalid = { deviceId: '', status: 'unknown' };
+      const invalidErrors = validateDeviceSchema(invalid);
+      assert.ok(invalidErrors.length >= 2);
     });
   });
 });

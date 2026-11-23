@@ -1,0 +1,276 @@
+{
+  "info": {
+    "_postman_id": "nexusflow-device-management-v1",
+    "name": "NexusFlow - Device Management & Telemetry API",
+    "description": "Postman Collection for testing NexusFlow backend Device Management API, Telemetry Ingestion, and Health endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01. Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "health"]
+        },
+        "description": "Check if the NexusFlow backend server is healthy and online."
+      },
+      "response": []
+    },
+    {
+      "name": "02. Fetch All Registered Devices",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/devices",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "devices"]
+        },
+        "description": "Retrieve all registered IoT devices in the NexusFlow registry."
+      },
+      "response": []
+    },
+    {
+      "name": "03. Fetch Device By ID (Valid)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/devices/TURBINE_001",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "devices", "TURBINE_001"]
+        },
+        "description": "Fetch a specific registered device by its deviceId (e.g., TURBINE_001)."
+      },
+      "response": []
+    },
+    {
+      "name": "04. Fetch Device By ID (Not Found - 404)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/devices/NON_EXISTENT_DEVICE_999",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "devices", "NON_EXISTENT_DEVICE_999"]
+        },
+        "description": "Verifies 404 Not Found error response when querying an unknown device ID."
+      },
+      "response": []
+    },
+    {
+      "name": "05. Register New Device (Success - 201)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceId\": \"GENERATOR_005\",\n  \"name\": \"Generator 05\",\n  \"type\": \"Temperature\",\n  \"unit\": \"°C\",\n  \"location\": \"Power Plant Substation 3\",\n  \"description\": \"Backup diesel generator unit\",\n  \"status\": \"offline\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/devices",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "devices"]
+        },
+        "description": "Register a new IoT device in NexusFlow."
+      },
+      "response": []
+    },
+    {
+      "name": "06. Register Device (Duplicate ID - 409 Conflict)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceId\": \"TURBINE_001\",\n  \"name\": \"Duplicate Turbine\",\n  \"type\": \"Temperature\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/devices",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "devices"]
+        },
+        "description": "Tests duplicate device ID handling. Must return 409 Conflict."
+      },
+      "response": []
+    },
+    {
+      "name": "07. Register Device (Missing Fields - 400 Validation Error)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Device Without ID\",\n  \"status\": \"invalid_status\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/devices",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "devices"]
+        },
+        "description": "Tests input validation when deviceId is missing and status is invalid. Returns 400 Bad Request with details."
+      },
+      "response": []
+    },
+    {
+      "name": "08. Filter Devices by Status (Online)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/devices?status=online",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "devices"],
+          "query": [
+            {
+              "key": "status",
+              "value": "online"
+            }
+          ]
+        },
+        "description": "Retrieve only online devices."
+      },
+      "response": []
+    },
+    {
+      "name": "09. Filter Devices by Status (Offline)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/devices?status=offline",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "devices"],
+          "query": [
+            {
+              "key": "status",
+              "value": "offline"
+            }
+          ]
+        },
+        "description": "Retrieve only offline devices (e.g. Pump 03)."
+      },
+      "response": []
+    },
+    {
+      "name": "10. Search Devices by Name / ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/devices?search=Boiler",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "devices"],
+          "query": [
+            {
+              "key": "search",
+              "value": "Boiler"
+            }
+          ]
+        },
+        "description": "Search devices matching query keyword."
+      },
+      "response": []
+    },
+    {
+      "name": "11. Update Device Details (PUT)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Turbine 01 Primary Unit\",\n  \"location\": \"Main Turbine Hall Level 2\",\n  \"status\": \"maintenance\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/devices/TURBINE_001",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "devices", "TURBINE_001"]
+        },
+        "description": "Update metadata or operational status of a device."
+      },
+      "response": []
+    },
+    {
+      "name": "12. Fetch Device Registry Stats",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/devices/stats",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "devices", "stats"]
+        },
+        "description": "Get operations overview device counts (total, online, offline, by type)."
+      },
+      "response": []
+    },
+    {
+      "name": "13. Ingest Telemetry Data (POST /api/telemetry)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceId\": \"TURBINE_001\",\n  \"temperature\": 85,\n  \"pressure\": 42,\n  \"timestamp\": \"2026-11-18T10:00:00.000Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/telemetry",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "telemetry"]
+        },
+        "description": "Ingest live sensor telemetry. Automatically updates device status to online and updates lastValue."
+      },
+      "response": []
+    },
+    {
+      "name": "14. Delete Registered Device (DELETE)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/devices/GENERATOR_005",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "devices", "GENERATOR_005"]
+        },
+        "description": "Delete a registered device by its ID."
+      },
+      "response": []
+    }
+  ]
+}
