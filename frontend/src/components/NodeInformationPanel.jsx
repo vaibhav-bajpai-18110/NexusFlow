@@ -13,21 +13,58 @@ function InformationField({ label, value, status }) {
   );
 }
 
-export default function NodeInformationPanel({ node }) {
+function formatLastSeen(value) {
+  if (!value) return 'No telemetry received';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+}
+
+function formatLocation(value) {
+  if (typeof value === 'string') return value || 'Not specified';
+  if (value?.label) return value.label;
+  if (Number.isFinite(value?.latitude) && Number.isFinite(value?.longitude)) {
+    return `${value.latitude}, ${value.longitude}`;
+  }
+  return 'Not specified';
+}
+
+export default function NodeInformationPanel({
+  node,
+  loading = false,
+  error = '',
+  onRetry,
+  heading = 'Node information',
+  emptyHint = 'Choose a device or pipeline step to see its details here.',
+  extendedDeviceDetails = false,
+}) {
   const isDevice = node?.nodeType === 'device';
   const Icon = node?.icon || Radio;
+  const deviceType = node?.deviceType || node?.type;
+  const latestValue = node?.reading ?? node?.lastValue;
 
   return (
     <aside className="node-information-panel" aria-label="Node information">
       <div className="node-information-heading">
         <div className="editor-section-heading">
-          <strong>Node information</strong>
-          <span>{node ? 'Selected node' : 'Select a node on the canvas'}</span>
+          <strong>{heading}</strong>
+          <span>{loading ? 'Loading details' : error ? 'Details unavailable' : node ? 'Selected item' : 'Nothing selected'}</span>
         </div>
         <Info size={15} aria-hidden="true" />
       </div>
 
-      {node ? (
+      {loading ? (
+        <div className="node-information-state" role="status">
+          <span className="large-spinner" aria-hidden="true" />
+          <strong>Loading device details</strong>
+          <p>Fetching the latest information from NexusFlow.</p>
+        </div>
+      ) : error ? (
+        <div className="node-information-state node-information-error" role="alert">
+          <strong>Device details couldn’t be loaded</strong>
+          <p>{error}</p>
+          {onRetry && <button className="button button-secondary" type="button" onClick={onRetry}>Try again</button>}
+        </div>
+      ) : node ? (
         <>
           <div className="node-information-summary">
             <span className={`pipeline-node-icon pipeline-node-icon-${node.tone || (isDevice ? 'device' : 'blue')}`}>
@@ -44,8 +81,11 @@ export default function NodeInformationPanel({ node }) {
             <div className="node-information-fields">
               <InformationField label="Device name" value={node.deviceName || node.title} />
               <InformationField label="Device ID" value={node.deviceId} />
+              {deviceType && <InformationField label="Device type" value={deviceType} />}
               <InformationField label="Connection status" value={node.connectionStatus || 'Unknown'} status={node.connectionStatus || 'Unknown'} />
-              {node.reading && <InformationField label={node.readingLabel || 'Latest reading'} value={node.reading} />}
+              {latestValue !== undefined && latestValue !== null && <InformationField label={node.readingLabel || 'Latest reading'} value={`${latestValue}${node.unit ? ` ${node.unit}` : ''}`} />}
+              {(node.location || (isDevice && extendedDeviceDetails)) && <InformationField label="Location" value={formatLocation(node.location)} />}
+              {(node.lastSeen !== undefined || (isDevice && extendedDeviceDetails)) && <InformationField label="Last seen" value={formatLastSeen(node.lastSeen)} />}
             </div>
           ) : (
             <div className="node-information-fields">
@@ -57,7 +97,7 @@ export default function NodeInformationPanel({ node }) {
           )}
         </>
       ) : (
-        <p className="node-information-empty">Choose a device or pipeline step to see its details here.</p>
+        <p className="node-information-empty">{emptyHint}</p>
       )}
     </aside>
   );

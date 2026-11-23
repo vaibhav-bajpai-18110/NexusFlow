@@ -11,11 +11,11 @@ function validateDevice(values, existingDevices) {
 
   if (!name) errors.name = 'Enter a device name.';
   else if (name.length < 2) errors.name = 'Use at least 2 characters.';
-  else if (name.length > 50) errors.name = 'Keep the name under 50 characters.';
+  else if (name.length > 100) errors.name = 'Keep the name under 100 characters.';
 
   if (!id) errors.id = 'Enter a device ID.';
-  else if (!/^[A-Za-z0-9_-]{2,30}$/.test(id)) errors.id = 'Use 2–30 letters, numbers, hyphens, or underscores.';
-  else if (existingDevices.some((device) => device.id.toLowerCase() === id.toLowerCase())) {
+  else if (!/^[A-Za-z0-9_-]{2,50}$/.test(id)) errors.id = 'Use 2–50 letters, numbers, hyphens, or underscores.';
+  else if (existingDevices.some((device) => (device.deviceId || device.id || '').toLowerCase() === id.toLowerCase())) {
     errors.id = 'That device ID is already registered.';
   }
 
@@ -26,30 +26,41 @@ function validateDevice(values, existingDevices) {
 export default function DeviceRegistrationForm({ existingDevices, onRegister }) {
   const [values, setValues] = useState(emptyValues);
   const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setValues((current) => ({ ...current, [name]: value }));
     setErrors((current) => current[name] ? { ...current, [name]: '' } : current);
+    setSubmitError('');
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     const nextErrors = validateDevice(values, existingDevices);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
 
-    onRegister({
-      name: values.name.trim(),
-      id: values.id.trim().toUpperCase(),
-      type: values.type,
-    });
-    setValues(emptyValues);
-    setErrors({});
+    setIsSubmitting(true);
+    setSubmitError('');
+    try {
+      await onRegister({
+        name: values.name.trim(),
+        deviceId: values.id.trim().toUpperCase(),
+        type: values.type,
+      });
+      setValues(emptyValues);
+      setErrors({});
+    } catch (error) {
+      setSubmitError(error.message || 'The device could not be registered.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <form className="panel registration-panel" onSubmit={handleSubmit} noValidate>
+    <form className="panel registration-panel" onSubmit={handleSubmit} noValidate aria-busy={isSubmitting}>
       <div className="registration-heading">
         <span className="registration-heading-icon"><Plus size={17} /></span>
         <div>
@@ -67,7 +78,7 @@ export default function DeviceRegistrationForm({ existingDevices, onRegister }) 
           value={values.name}
           onChange={handleChange}
           placeholder="e.g. Turbine 05"
-          maxLength={50}
+          maxLength={100}
           autoComplete="off"
           aria-invalid={Boolean(errors.name)}
           aria-describedby={errors.name ? 'device-name-error' : undefined}
@@ -84,7 +95,7 @@ export default function DeviceRegistrationForm({ existingDevices, onRegister }) 
           value={values.id}
           onChange={handleChange}
           placeholder="e.g. TURBINE_005"
-          maxLength={30}
+          maxLength={50}
           autoComplete="off"
           spellCheck="false"
           aria-invalid={Boolean(errors.id)}
@@ -111,10 +122,12 @@ export default function DeviceRegistrationForm({ existingDevices, onRegister }) 
         {errors.type && <span className="field-error" id="device-type-error" role="alert">{errors.type}</span>}
       </div>
 
-      <button className="button button-primary registration-submit" type="submit">
-        <Check size={15} /> Register device
+      <button className="button button-primary registration-submit" type="submit" disabled={isSubmitting}>
+        {isSubmitting ? <span className="mini-spinner" aria-hidden="true" /> : <Check size={15} />}
+        {isSubmitting ? 'Registering…' : 'Register device'}
       </button>
-      <p className="registration-footnote">New devices start as Pending. This demo saves the registry in this browser.</p>
+      {submitError && <p className="form-submit-error" role="alert">{submitError}</p>}
+      <p className="registration-footnote">New devices are added through the NexusFlow API.</p>
     </form>
   );
 }

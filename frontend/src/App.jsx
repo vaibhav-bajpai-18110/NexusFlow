@@ -9,20 +9,11 @@ import {
   Plus,
   Radio,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
   Thermometer,
   Workflow,
 } from 'lucide-react';
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import Sidebar from './components/Sidebar.jsx';
 import Navbar from './components/Navbar.jsx';
 import MetricCard from './components/MetricCard.jsx';
@@ -30,6 +21,9 @@ import WorkflowCanvas from './components/WorkflowCanvas.jsx';
 import NodeInformationPanel from './components/NodeInformationPanel.jsx';
 import DeviceRegistrationForm from './components/DeviceRegistrationForm.jsx';
 import DeviceList from './components/DeviceList.jsx';
+import TelemetryPanel from './components/TelemetryPanel.jsx';
+import RuleManagement from './components/RuleManagement.jsx';
+import { fetchDevice, fetchDevices, registerDevice } from './services/deviceApi.js';
 
 const pageCopy = {
   Devices: {
@@ -37,6 +31,12 @@ const pageCopy = {
     title: 'Device Management',
     description: 'Register devices and review their IDs, types, and connection status.',
     icon: Cpu,
+  },
+  Rules: {
+    eyebrow: 'Automation',
+    title: 'Rules Management',
+    description: 'Create threshold rules to monitor device metrics.',
+    icon: SlidersHorizontal,
   },
   Pipelines: {
     eyebrow: 'Visual editor',
@@ -102,26 +102,6 @@ const events = [
   },
 ];
 
-const telemetry = [
-  { time: '09:00', temperature: 71 },
-  { time: '09:20', temperature: 73 },
-  { time: '09:40', temperature: 72 },
-  { time: '10:00', temperature: 75 },
-  { time: '10:20', temperature: 76 },
-  { time: '10:40', temperature: 74 },
-  { time: '11:00', temperature: 77 },
-  { time: '11:20', temperature: 79 },
-  { time: '11:40', temperature: 82 },
-  { time: '12:00', temperature: 85 },
-];
-
-const initialDevices = [
-  { name: 'Turbine 01', id: 'TURBINE_001', type: 'Temperature', status: 'Online', value: '78°C' },
-  { name: 'Motor 02', id: 'MOTOR_002', type: 'Vibration', status: 'Online', value: '2.1 mm/s' },
-  { name: 'Pump 03', id: 'PUMP_003', type: 'Pressure', status: 'Offline', value: '—' },
-  { name: 'Boiler 04', id: 'BOILER_004', type: 'Temperature', status: 'Online', value: '71°C' },
-];
-
 const alerts = [
   { level: 'Critical', device: 'Turbine 01', message: 'Temperature above threshold', value: '85°C', tone: 'critical' },
   { level: 'Warning', device: 'Motor 02', message: 'Vibration approaching limit', value: '2.1 mm/s', tone: 'warning' },
@@ -134,28 +114,6 @@ function readSavedTheme() {
   } catch {
     return 'dark';
   }
-}
-
-function readSavedDevices() {
-  try {
-    const savedDevices = JSON.parse(window.localStorage.getItem('nexusflow-devices') || 'null');
-    if (Array.isArray(savedDevices) && savedDevices.every((device) => (
-      device && typeof device.name === 'string' && typeof device.id === 'string' && typeof device.type === 'string'
-    ))) return savedDevices;
-  } catch {
-    // Use the sample registry if storage is unavailable or invalid.
-  }
-  return initialDevices;
-}
-
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="chart-tooltip">
-      <span>{label}</span>
-      <strong>{payload[0].value}°C</strong>
-    </div>
-  );
 }
 
 function EventList({ compact = false }) {
@@ -178,7 +136,7 @@ function EventList({ compact = false }) {
   );
 }
 
-function Overview({ onOpenPipelines, onOpenActivity }) {
+function Overview({ onOpenPipelines, onOpenActivity, onOpenDevices }) {
   return (
     <>
       <section className="page-heading">
@@ -188,7 +146,7 @@ function Overview({ onOpenPipelines, onOpenActivity }) {
           <p className="page-description">Monitor device health, temperature telemetry, and active pipelines.</p>
         </div>
         <div className="heading-actions">
-          <div className="system-pill"><span className="system-pulse" /> Simulator sample data</div>
+          <div className="system-pill"><span className="system-pulse" /> Telemetry · NexusFlow API</div>
           <button className="button button-primary" onClick={onOpenPipelines}>
             <Plus size={16} strokeWidth={2.4} /> New pipeline
           </button>
@@ -200,41 +158,7 @@ function Overview({ onOpenPipelines, onOpenActivity }) {
       </section>
 
       <section className="dashboard-grid">
-        <div className="panel chart-panel">
-          <div className="panel-heading">
-            <div>
-              <div className="panel-title-row">
-                <h2>Temperature telemetry</h2>
-                <span className="live-tag"><span /> Simulator</span>
-              </div>
-              <p>Turbine 01 · illustrative readings</p>
-            </div>
-            <div className="chart-current"><span>Current sample</span><strong>85°C</strong></div>
-          </div>
-          <div className="chart-key">
-            <span className="threshold-key"><i /> Threshold · 80°C</span>
-            <span>Average window · 5 readings</span>
-          </div>
-          <div className="telemetry-chart">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={telemetry} margin={{ top: 15, right: 18, left: -18, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="temperature-fill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#8da2ff" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#8da2ff" stopOpacity={0.01} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="4 5" vertical={false} />
-                <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-label)', fontSize: 9 }} dy={8} />
-                <YAxis domain={[65, 90]} ticks={[70, 80, 90]} tickFormatter={(value) => value + '°'} axisLine={false} tickLine={false} tick={{ fill: 'var(--chart-label)', fontSize: 9 }} />
-                <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#607196', strokeDasharray: '3 4' }} />
-                <ReferenceLine y={80} stroke="#e8b86b" strokeDasharray="5 5" />
-                <Area type="monotone" dataKey="temperature" stroke="#91a4ff" strokeWidth={2} fill="url(#temperature-fill)" activeDot={{ r: 4, fill: '#c6d0ff', stroke: '#5368bb', strokeWidth: 2 }} isAnimationActive={false} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="chart-footnote"><span className="demo-dot" /> Demo values only · actual readings and thresholds are configurable.</div>
-        </div>
+        <TelemetryPanel onOpenDevices={onOpenDevices} />
 
         <div className="panel activity-panel">
           <div className="panel-heading activity-heading">
@@ -263,12 +187,175 @@ function Overview({ onOpenPipelines, onOpenActivity }) {
   );
 }
 
-function DevicesPage({ devices, onRegisterDevice }) {
+function deviceIdOf(device) {
+  return device?.deviceId || device?.id || '';
+}
+
+function asDeviceNode(device) {
+  if (!device) return null;
+  const deviceId = deviceIdOf(device);
+  return {
+    nodeType: 'device',
+    category: 'DEVICE',
+    title: device.name || deviceId,
+    deviceName: device.name || deviceId,
+    deviceId,
+    deviceType: device.type || device.deviceType || 'Device',
+    connectionStatus: device.status || 'unknown',
+    readingLabel: 'Latest reading',
+    reading: device.lastValue ?? '—',
+    unit: device.unit || '',
+    location: device.location,
+    lastSeen: device.lastSeen,
+    description: device.description || '',
+  };
+}
+
+function DevicesPage({ setNotice }) {
+  const [devices, setDevices] = useState([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState('');
+  const [listRetry, setListRetry] = useState(0);
+  const [selectedDeviceId, setSelectedDeviceId] = useState('');
+  const [deviceDetails, setDeviceDetails] = useState(null);
+  const [deviceDetailsId, setDeviceDetailsId] = useState('');
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState('');
+  const [detailsRetry, setDetailsRetry] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setListLoading(true);
+    setListError('');
+
+    fetchDevices({ signal: controller.signal })
+      .then((result) => {
+        setDevices(result);
+        setSelectedDeviceId((currentId) => (
+          currentId && result.some((device) => deviceIdOf(device) === currentId)
+            ? currentId
+            : deviceIdOf(result[0])
+        ));
+      })
+      .catch((error) => {
+        if (error.name === 'AbortError') return;
+        setDevices([]);
+        setSelectedDeviceId('');
+        setListError(error.message || 'The device list could not be loaded.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setListLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [listRetry]);
+
+  useEffect(() => {
+    if (!selectedDeviceId) {
+      setDeviceDetails(null);
+      setDeviceDetailsId('');
+      setDetailsError('');
+      setDetailsLoading(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setDeviceDetails(null);
+    setDeviceDetailsId(selectedDeviceId);
+    setDetailsLoading(true);
+    setDetailsError('');
+
+    fetchDevice(selectedDeviceId, { signal: controller.signal })
+      .then((device) => setDeviceDetails(device))
+      .catch((error) => {
+        if (error.name === 'AbortError') return;
+        setDetailsError(error.message || 'Device details could not be loaded.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDetailsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [selectedDeviceId, detailsRetry]);
+
+  const handleRegisterDevice = async (device) => {
+    const createdDevice = await registerDevice(device);
+    const createdId = deviceIdOf(createdDevice);
+    if (!createdId) throw new Error('The API created the device but did not return its deviceId.');
+
+    setDevices((currentDevices) => [
+      createdDevice,
+      ...currentDevices.filter((currentDevice) => deviceIdOf(currentDevice) !== createdId),
+    ]);
+    setListError('');
+    setSelectedDeviceId(createdId);
+    setListRetry((current) => current + 1);
+    setNotice(`${createdDevice.name || createdId} registered successfully.`);
+  };
+
+  const displayedDevice = deviceDetailsId === selectedDeviceId ? deviceDetails : null;
+  const showingDetailsLoading = Boolean(selectedDeviceId) && (detailsLoading || deviceDetailsId !== selectedDeviceId);
+
   return (
     <section className="device-management-grid" aria-label="Device management">
-      <DeviceRegistrationForm existingDevices={devices} onRegister={onRegisterDevice} />
-      <DeviceList devices={devices} />
+      <DeviceRegistrationForm existingDevices={devices} onRegister={handleRegisterDevice} />
+      <div className="device-dashboard-column">
+        <DeviceList
+          devices={devices}
+          loading={listLoading}
+          error={listError}
+          selectedDeviceId={selectedDeviceId}
+          onSelect={setSelectedDeviceId}
+          onRetry={() => setListRetry((current) => current + 1)}
+        />
+        <NodeInformationPanel
+          node={asDeviceNode(displayedDevice)}
+          loading={showingDetailsLoading}
+          error={deviceDetailsId === selectedDeviceId ? detailsError : ''}
+          onRetry={() => setDetailsRetry((current) => current + 1)}
+          heading="Device details"
+          emptyHint={listError ? 'Device details will appear when the API is reachable.' : 'Select a device to see its details.'}
+          extendedDeviceDetails
+        />
+      </div>
     </section>
+  );
+}
+
+function RulesPage() {
+  const [devices, setDevices] = useState([]);
+  const [devicesLoading, setDevicesLoading] = useState(true);
+  const [devicesError, setDevicesError] = useState('');
+  const [devicesRetry, setDevicesRetry] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setDevicesLoading(true);
+    setDevicesError('');
+
+    fetchDevices({ signal: controller.signal })
+      .then(setDevices)
+      .catch((error) => {
+        if (error.name === 'AbortError') return;
+        setDevices([]);
+        setDevicesError(error.message || 'Device options could not be loaded.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDevicesLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [devicesRetry]);
+
+  return (
+    <RuleManagement
+      devices={devices}
+      devicesLoading={devicesLoading}
+      devicesError={devicesError}
+      onRetryDevices={() => setDevicesRetry((current) => current + 1)}
+      rules={[]}
+      rulesApiAvailable={false}
+    />
   );
 }
 
@@ -387,7 +474,6 @@ export default function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const [theme, setTheme] = useState(readSavedTheme);
-  const [devices, setDevices] = useState(readSavedDevices);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -398,22 +484,9 @@ export default function App() {
     }
   }, [theme]);
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem('nexusflow-devices', JSON.stringify(devices));
-    } catch {
-      // Device registration remains usable for this session when storage is unavailable.
-    }
-  }, [devices]);
-
   const handleNavigate = (view) => {
     setActiveView(view);
     setMobileNavOpen(false);
-  };
-
-  const handleRegisterDevice = (device) => {
-    setDevices((currentDevices) => [{ ...device, status: 'Pending', value: '—' }, ...currentDevices]);
-    setNotice(`${device.name} registered and pending connection.`);
   };
 
   const currentPage = activeView === 'Overview' ? null : pageCopy[activeView];
@@ -433,14 +506,19 @@ export default function App() {
 
         <main className="page-content">
           {activeView === 'Overview' ? (
-            <Overview onOpenPipelines={() => handleNavigate('Pipelines')} onOpenActivity={() => handleNavigate('Activity')} />
+            <Overview
+              onOpenPipelines={() => handleNavigate('Pipelines')}
+              onOpenActivity={() => handleNavigate('Activity')}
+              onOpenDevices={() => handleNavigate('Devices')}
+            />
           ) : (
             <>
               <section className="page-heading">
                 <div><p className="eyebrow">{currentPage.eyebrow}</p><h1>{currentPage.title}</h1><p className="page-description">{currentPage.description}</p></div>
-                <div className="heading-actions"><div className="system-pill"><span className="system-pulse" /> Simulator sample data</div></div>
+                <div className="heading-actions"><div className="system-pill"><span className="system-pulse" />{activeView === 'Devices' ? 'NexusFlow API' : activeView === 'Rules' ? 'API connection pending' : 'Simulator sample data'}</div></div>
               </section>
-              {activeView === 'Devices' && <DevicesPage devices={devices} onRegisterDevice={handleRegisterDevice} />}
+              {activeView === 'Devices' && <DevicesPage setNotice={setNotice} />}
+              {activeView === 'Rules' && <RulesPage />}
               {activeView === 'Pipelines' && <PipelineWorkspace setNotice={setNotice} />}
               {activeView === 'Alerts' && <AlertsPage />}
               {activeView === 'Activity' && <ActivityPage />}
