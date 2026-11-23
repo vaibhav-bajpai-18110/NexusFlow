@@ -1,4 +1,5 @@
-import { Activity, Cpu, Droplets, Gauge, Radio, Thermometer } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Activity, Cpu, Droplets, Gauge, Radio, Search, Thermometer, X } from 'lucide-react';
 
 const deviceIcons = {
   Temperature: Thermometer,
@@ -9,6 +10,34 @@ const deviceIcons = {
 };
 
 export default function DeviceList({ devices, loading, error, selectedDeviceId, onSelect, onRetry }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const filteredDevices = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return devices.filter((device) => {
+      const deviceId = device.deviceId || device.id || '';
+      const deviceType = device.type || device.deviceType || 'Device';
+      const location = typeof device.location === 'string'
+        ? device.location
+        : device.location?.label || '';
+      const searchMatch = !query || [device.name, deviceId, deviceType, location]
+        .some((value) => String(value || '').toLowerCase().includes(query));
+      const statusMatch = statusFilter === 'all' || String(device.status || 'unknown').toLowerCase() === statusFilter;
+      return searchMatch && statusMatch;
+    });
+  }, [devices, searchQuery, statusFilter]);
+
+  useEffect(() => {
+    if (selectedDeviceId && !filteredDevices.some((device) => (device.deviceId || device.id) === selectedDeviceId)) {
+      onSelect('');
+    }
+  }, [filteredDevices, onSelect, selectedDeviceId]);
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+  };
+
   return (
     <section className="panel data-panel device-list-panel" aria-labelledby="registered-devices-heading" aria-busy={loading}>
       <div className="panel-heading data-panel-heading">
@@ -18,6 +47,34 @@ export default function DeviceList({ devices, loading, error, selectedDeviceId, 
         </div>
         <span className="demo-label">{loading ? 'LOADING' : `${String(devices.length).padStart(2, '0')} DEVICES`}</span>
       </div>
+
+      {!loading && !error && devices.length > 0 && (
+        <div className="device-list-toolbar">
+          <label className="device-search-control">
+            <Search size={15} aria-hidden="true" />
+            <span className="sr-only">Search devices</span>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search name or device ID"
+              aria-label="Search devices by name, ID, type, or location"
+            />
+            {searchQuery && <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear device search"><X size={13} /></button>}
+          </label>
+          <label className="device-status-filter">
+            <span className="sr-only">Filter by status</span>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter devices by connection status">
+              <option value="all">All statuses</option>
+              <option value="online">Online</option>
+              <option value="offline">Offline</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </label>
+          <span className="device-filter-count" aria-live="polite">{filteredDevices.length} shown</span>
+        </div>
+      )}
 
       {loading ? (
         <div className="device-list-loading" role="status" aria-label="Loading devices">
@@ -35,9 +92,9 @@ export default function DeviceList({ devices, loading, error, selectedDeviceId, 
           <p>{error}</p>
           <button className="button button-secondary" type="button" onClick={onRetry}>Try again</button>
         </div>
-      ) : devices.length ? (
+      ) : devices.length && filteredDevices.length ? (
         <div className="registered-device-list" role="list">
-          {devices.map((device) => {
+          {filteredDevices.map((device) => {
             const deviceId = device.deviceId || device.id;
             const deviceType = device.type || device.deviceType || 'Device';
             const status = String(device.status || 'unknown');
@@ -70,6 +127,12 @@ export default function DeviceList({ devices, loading, error, selectedDeviceId, 
               </div>
             );
           })}
+        </div>
+      ) : devices.length ? (
+        <div className="device-filter-empty" role="status">
+          <strong>No devices match these filters</strong>
+          <p>Try another search or choose a different connection status.</p>
+          <button className="button button-secondary" type="button" onClick={clearFilters}>Clear filters</button>
         </div>
       ) : (
         <div className="device-list-empty">
