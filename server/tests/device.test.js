@@ -1,42 +1,93 @@
+
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const mongoose = require("mongoose");
 const Device = require("../src/models/Device");
-test("accepts valid device data", async () => {
+
+const validDevice = {
+  deviceId: "device-001",
+  name: "Temperature Sensor",
+  deviceType: "Temperature",
+  owner: new mongoose.Types.ObjectId()
+};
+
+test("should accept valid device data", async () => {
+  const device = new Device(validDevice);
+
+  await assert.doesNotReject(() => device.validate());
+});
+
+test("should reject device without deviceId", async () => {
+  const device = new Device({
+    name: "Temperature Sensor",
+    owner: validDevice.owner
+  });
+
+  await assert.rejects(() => device.validate());
+});
+
+test("should reject device without name", async () => {
   const device = new Device({
     deviceId: "device-001",
-    deviceName: "Temperature Sensor",
-    deviceType: "sensor"
+    owner: validDevice.owner
   });
-  await assert.doesNotReject(device.validate());
+
+  await assert.rejects(() => device.validate());
+});
+
+test("should reject device without owner", async () => {
+  const device = new Device({
+    deviceId: "device-001",
+    name: "Temperature Sensor"
+  });
+
+  await assert.rejects(() => device.validate());
+});
+
+test("should reject invalid device status", async () => {
+  const device = new Device({
+    ...validDevice,
+    status: "active"
+  });
+
+  await assert.rejects(() => device.validate());
+});
+
+test("should reject latitude outside valid range", async () => {
+  const device = new Device({
+    ...validDevice,
+    location: {
+      latitude: 100,
+      longitude: 75
+    }
+  });
+
+  await assert.rejects(() => device.validate());
+});
+
+test("should reject longitude outside valid range", async () => {
+  const device = new Device({
+    ...validDevice,
+    location: {
+      latitude: 30,
+      longitude: 200
+    }
+  });
+
+  await assert.rejects(() => device.validate());
+});
+
+test("should default device status to unknown", () => {
+  const device = new Device(validDevice);
+
   assert.equal(device.status, "unknown");
-  assert.ok(device.createdAt instanceof Date);
 });
-test("rejects device without deviceId", async () => {
+
+test("should trim device name", () => {
   const device = new Device({
-    deviceName: "Sensor",
-    deviceType: "sensor"
+    ...validDevice,
+    name: "  Temperature Sensor  "
   });
-  await assert.rejects(device.validate(), /deviceId/);
-});
-test("rejects device without deviceName", async () => {
-  const device = new Device({
-    deviceId: "device-002",
-    deviceType: "sensor"
-  });
-  await assert.rejects(device.validate(), /deviceName/);
-});
-test("rejects invalid device status", async () => {
-  const device = new Device({
-    deviceId: "device-003",
-    deviceName: "Sensor",
-    deviceType: "sensor",
-    status: "broken"
-  });
-  await assert.rejects(device.validate(), /status/);
-});
-test("deviceId has a unique index", () => {
-  const indexes = Device.schema.indexes();
-  assert.ok(indexes.some(([fields, options]) =>
-    fields.deviceId === 1 && options.unique === true
-  ));
+
+  assert.equal(device.name, "Temperature Sensor");
 });

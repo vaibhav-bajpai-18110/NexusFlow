@@ -1,15 +1,17 @@
 {
-  "name": "nexusflow-server",
+  "name": "server",
   "version": "1.0.0",
-  "description": "NexusFlow backend database layer",
-  "main": "src/index.js",
+  "description": "",
+  "main": "index.js",
   "scripts": {
-  "start": "node src/index.js",
-  "test": "node --test tests/*.test.js"
-},
+    "test": "node --test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
   "dependencies": {
-  "dotenv": "*",
-  "express": "*",
-  "mongoose": "*"
-}
+    "dotenv": "^18.0.10",
+    "mongoose": "^9.12.1"
+  }
 }
