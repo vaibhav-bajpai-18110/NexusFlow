@@ -1,1 +1,1 @@
-export { default } from '../../../backend/src/routes/rule.routes.js';
+module.exports = require("../../../backend/src/routes/rule.routes.js").default;

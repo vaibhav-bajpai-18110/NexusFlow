@@ -78,6 +78,7 @@ async function getDevicesByType(req, res) {
 module.exports = {
   createDevice,
   getAllDevices,
+  getDevices: getAllDevices,
   getDeviceById,
   getDevicesByType
 };

@@ -1,2 +1,4 @@
-export * from '../../../backend/src/services/ruleEvaluation.service.js';
-export { default } from '../../../backend/src/services/ruleEvaluation.service.js';
+const service = require("../../../backend/src/services/ruleEvaluation.service.js");
+
+exports.RuleEvaluationService = service.RuleEvaluationService;
+exports.ruleEvaluationService = service.ruleEvaluationService;
