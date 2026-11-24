@@ -334,4 +334,143 @@ describe('Device Registry API (/api/devices)', () => {
       assert.ok(invalidErrors.length >= 2);
     });
   });
+
+  // =========================================================================
+  // Task 9: Frontend API Contract & Registration Verification
+  // =========================================================================
+  describe('Frontend API Contract & Registration Verification (Task 9)', () => {
+    it('registers a device using exact frontend DeviceRegistrationForm contract payload { name, deviceId, type }', async () => {
+      const frontendPayload = {
+        name: 'Turbine 05',
+        deviceId: 'TURBINE_005',
+        type: 'Temperature',
+      };
+
+      const response = await client('/api/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(frontendPayload),
+      });
+
+      const body = await response.json();
+
+      assert.equal(response.status, 201);
+      assert.equal(body.success, true);
+      assert.equal(body.status, 'success');
+      assert.equal(body.message, 'Device registered successfully');
+      assert.ok(body.data && typeof body.data === 'object');
+
+      // Verify both deviceId and id alias are present for frontend deviceIdOf(device)
+      assert.equal(body.data.deviceId, 'TURBINE_005');
+      assert.equal(body.data.id, 'TURBINE_005');
+      assert.equal(body.data.name, 'Turbine 05');
+      assert.equal(body.data.type, 'Temperature');
+      // Verify unit was smartly inferred from type
+      assert.equal(body.data.unit, '°C');
+      assert.equal(body.data.status, 'offline');
+      assert.equal(body.data.lastValue, null);
+      assert.ok(body.data.createdAt);
+      assert.ok(body.data.updatedAt);
+    });
+
+    it('accepts { name, id, type } payload where id is provided instead of deviceId', async () => {
+      const payloadWithId = {
+        name: 'Pressure Sensor 08',
+        id: 'PRESSURE_008',
+        type: 'Pressure',
+      };
+
+      const response = await client('/api/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payloadWithId),
+      });
+
+      const body = await response.json();
+
+      assert.equal(response.status, 201);
+      assert.equal(body.success, true);
+      assert.equal(body.data.deviceId, 'PRESSURE_008');
+      assert.equal(body.data.id, 'PRESSURE_008');
+      assert.equal(body.data.unit, 'bar');
+    });
+
+    it('returns consistent data structure for GET /api/devices matching frontend fetchDevices contract', async () => {
+      const response = await client('/api/devices');
+      const body = await response.json();
+
+      assert.equal(response.status, 200);
+      assert.equal(body.success, true);
+      assert.equal(body.status, 'ok');
+      assert.ok(Array.isArray(body.data), 'body.data must be an array for fetchDevices()');
+
+      // Verify all items in list have required fields consumed by frontend DeviceList
+      for (const device of body.data) {
+        assert.ok(device.deviceId, 'Every device must have deviceId');
+        assert.equal(device.id, device.deviceId, 'device.id must match device.deviceId');
+        assert.ok(device.name, 'Every device must have name');
+        assert.ok(device.type, 'Every device must have type');
+        assert.ok(device.status, 'Every device must have status');
+        assert.ok('lastValue' in device, 'Every device must have lastValue property');
+        assert.ok('unit' in device, 'Every device must have unit property');
+      }
+    });
+
+    it('returns consistent data record for GET /api/devices/:id matching frontend fetchDevice contract', async () => {
+      const response = await client('/api/devices/TURBINE_001');
+      const body = await response.json();
+
+      assert.equal(response.status, 200);
+      assert.equal(body.success, true);
+      assert.equal(body.status, 'ok');
+      assert.ok(body.data && typeof body.data === 'object');
+      assert.equal(body.data.deviceId, 'TURBINE_001');
+      assert.equal(body.data.id, 'TURBINE_001');
+      assert.equal(body.data.name, 'Turbine 01');
+      assert.equal(body.data.type, 'Temperature');
+      assert.equal(body.data.unit, '°C');
+    });
+
+    it('returns clear structured validation errors matching frontend formatApiError', async () => {
+      const response = await client('/api/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: 'X', // too short (< 2)
+          status: 'invalid_status',
+        }),
+      });
+
+      const body = await response.json();
+
+      assert.equal(response.status, 400);
+      assert.equal(body.success, false);
+      assert.equal(body.status, 'fail');
+      assert.equal(body.message, 'Validation failed for device registration');
+      assert.ok(Array.isArray(body.details));
+
+      const deviceIdError = body.details.find((d) => d.field === 'deviceId');
+      assert.ok(deviceIdError);
+      assert.match(deviceIdError.message, /between 2 and 50 characters/);
+
+      const statusError = body.details.find((d) => d.field === 'status');
+      assert.ok(statusError);
+      assert.match(statusError.message, /must be one of: online, offline, maintenance/);
+    });
+
+    it('verifies device controller and route mirror resolution', async () => {
+      const serverController = await import('../../server/src/controllers/deviceController.js');
+      assert.equal(typeof serverController.getDevices, 'function');
+      assert.equal(typeof serverController.createDevice, 'function');
+
+      const serverRoutes = await import('../../server/src/routes/deviceRoutes.js');
+      assert.equal(typeof serverRoutes.default, 'function');
+
+      const backendController = await import('../src/controllers/deviceController.js');
+      assert.equal(typeof backendController.createDevice, 'function');
+
+      const backendRoutes = await import('../src/routes/deviceRoutes.js');
+      assert.equal(typeof backendRoutes.default, 'function');
+    });
+  });
 });

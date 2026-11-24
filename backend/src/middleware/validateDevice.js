@@ -22,15 +22,17 @@ export function validateCreateDevice(req, _res, next) {
     );
   }
 
-  // 1. deviceId validation
-  const rawDeviceId = body.deviceId ?? body.device_id;
+  // 1. deviceId validation (supports deviceId, device_id, or id)
+  const rawDeviceId = body.deviceId ?? body.device_id ?? body.id;
   if (rawDeviceId === undefined || rawDeviceId === null) {
     errors.push({ field: 'deviceId', message: 'deviceId is required' });
   } else if (typeof rawDeviceId !== 'string') {
     errors.push({ field: 'deviceId', message: 'deviceId must be a string' });
   } else {
     const trimmed = rawDeviceId.trim();
-    if (trimmed.length < 2 || trimmed.length > 50) {
+    if (trimmed.length === 0) {
+      errors.push({ field: 'deviceId', message: 'deviceId cannot be empty' });
+    } else if (trimmed.length < 2 || trimmed.length > 50) {
       errors.push({
         field: 'deviceId',
         message: 'deviceId must be between 2 and 50 characters long',
@@ -40,6 +42,8 @@ export function validateCreateDevice(req, _res, next) {
         field: 'deviceId',
         message: 'deviceId can only contain letters, numbers, hyphens (-), and underscores (_)',
       });
+    } else {
+      req.body.deviceId = trimmed.toUpperCase();
     }
   }
 
@@ -145,8 +149,8 @@ export function validateUpdateDevice(req, _res, next) {
   }
 
   // Disallow mutating deviceId
-  if (body.deviceId !== undefined || body.device_id !== undefined) {
-    const attemptedId = (body.deviceId ?? body.device_id)?.toString().toUpperCase().trim();
+  if (body.deviceId !== undefined || body.device_id !== undefined || body.id !== undefined) {
+    const attemptedId = (body.deviceId ?? body.device_id ?? body.id)?.toString().toUpperCase().trim();
     const routeId = req.params.id?.toString().toUpperCase().trim();
     if (attemptedId !== routeId) {
       errors.push({
