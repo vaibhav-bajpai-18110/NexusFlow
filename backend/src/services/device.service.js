@@ -7,6 +7,7 @@ import { AppError } from '../utils/AppError.js';
 const DEFAULT_DEMO_DEVICES = [
   {
     deviceId: 'TURBINE_001',
+    id: 'TURBINE_001',
     name: 'Turbine 01',
     type: 'Temperature',
     unit: '°C',
@@ -20,6 +21,7 @@ const DEFAULT_DEMO_DEVICES = [
   },
   {
     deviceId: 'MOTOR_002',
+    id: 'MOTOR_002',
     name: 'Motor 02',
     type: 'Vibration',
     unit: 'mm/s',
@@ -33,6 +35,7 @@ const DEFAULT_DEMO_DEVICES = [
   },
   {
     deviceId: 'PUMP_003',
+    id: 'PUMP_003',
     name: 'Pump 03',
     type: 'Pressure',
     unit: 'bar',
@@ -46,6 +49,7 @@ const DEFAULT_DEMO_DEVICES = [
   },
   {
     deviceId: 'BOILER_004',
+    id: 'BOILER_004',
     name: 'Boiler 04',
     type: 'Temperature',
     unit: '°C',
@@ -73,7 +77,12 @@ class DeviceService extends EventEmitter {
   resetToDefaults() {
     this.devices.clear();
     for (const dev of DEFAULT_DEMO_DEVICES) {
-      this.devices.set(dev.deviceId.toUpperCase(), { ...dev });
+      const id = dev.deviceId.toUpperCase();
+      this.devices.set(id, {
+        ...dev,
+        id,
+        deviceId: id,
+      });
     }
   }
 
@@ -124,19 +133,31 @@ class DeviceService extends EventEmitter {
    * @param {object} deviceData
    */
   create(deviceData) {
-    const normalizedId = deviceData.deviceId.toUpperCase().trim();
+    const rawId = deviceData.deviceId ?? deviceData.device_id ?? deviceData.id;
+    const normalizedId = rawId ? rawId.toString().toUpperCase().trim() : '';
+
+    if (!normalizedId) {
+      throw new AppError('deviceId is required', 400);
+    }
 
     if (this.devices.has(normalizedId)) {
       throw new AppError(`Device with ID "${normalizedId}" already exists`, 409);
     }
 
+    const type = deviceData.type ? deviceData.type.trim() : 'General';
+    const unit =
+      deviceData.unit !== undefined && deviceData.unit !== null && deviceData.unit !== ''
+        ? deviceData.unit.trim()
+        : inferUnit(type);
+
     const now = new Date().toISOString();
     const newDevice = {
       deviceId: normalizedId,
-      name: deviceData.name ? deviceData.name.trim() : normalizedId,
-      type: deviceData.type ? deviceData.type.trim() : 'General',
-      unit: deviceData.unit ? deviceData.unit.trim() : '',
-      status: deviceData.status ? deviceData.status.toLowerCase() : 'offline',
+      id: normalizedId,
+      name: deviceData.name && deviceData.name.trim() ? deviceData.name.trim() : normalizedId,
+      type,
+      unit,
+      status: deviceData.status ? deviceData.status.toLowerCase().trim() : 'offline',
       lastValue: deviceData.lastValue !== undefined ? deviceData.lastValue : null,
       location: deviceData.location ? deviceData.location.trim() : '',
       description: deviceData.description ? deviceData.description.trim() : '',
@@ -162,12 +183,16 @@ class DeviceService extends EventEmitter {
       return null;
     }
 
+    const type = updateData.type !== undefined ? updateData.type.trim() : existing.type;
+    const unit = updateData.unit !== undefined ? updateData.unit.trim() : existing.unit;
+
     const updated = {
       ...existing,
+      id: existing.deviceId,
       name: updateData.name !== undefined ? updateData.name.trim() : existing.name,
-      type: updateData.type !== undefined ? updateData.type.trim() : existing.type,
-      unit: updateData.unit !== undefined ? updateData.unit.trim() : existing.unit,
-      status: updateData.status !== undefined ? updateData.status.toLowerCase() : existing.status,
+      type,
+      unit,
+      status: updateData.status !== undefined ? updateData.status.toLowerCase().trim() : existing.status,
       location: updateData.location !== undefined ? updateData.location.trim() : existing.location,
       description:
         updateData.description !== undefined
@@ -231,6 +256,7 @@ class DeviceService extends EventEmitter {
       const inferredType = metricKeys.length > 0 ? capitalize(metricKeys[0]) : 'Sensor';
       device = {
         deviceId: normalizedId,
+        id: normalizedId,
         name: normalizedId,
         type: inferredType,
         unit: inferUnit(inferredType),
@@ -248,6 +274,7 @@ class DeviceService extends EventEmitter {
     } else {
       device = {
         ...device,
+        id: device.deviceId,
         status: 'online',
         lastValue: primaryMetricValue !== null ? primaryMetricValue : device.lastValue,
         lastMetrics: metrics,
