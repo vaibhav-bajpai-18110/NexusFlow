@@ -180,7 +180,7 @@ export default function RuleManagement({
           {creating ? <span className="mini-spinner" aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}
           {creating ? 'Creating rule…' : 'Create rule'}
         </button>
-        {!rulesApiAvailable && <p className="rule-api-note" role="status">Rule saving will be enabled when the backend API and credentials are available.</p>}
+        {!rulesApiAvailable && <p className="rule-api-note" role="status">Rule saving will be enabled when the backend provides a Rules API endpoint.</p>}
         {submitError && <p className="rule-submit-message rule-submit-error" role="alert"><AlertCircle size={14} />{submitError}</p>}
         {successMessage && <p className="rule-submit-message rule-submit-success" role="status"><Check size={14} />{successMessage}</p>}
       </form>
@@ -202,7 +202,7 @@ export default function RuleManagement({
           <div className="rule-list-state rule-api-pending" role="status">
             <span className="rule-empty-icon"><ListFilter size={18} aria-hidden="true" /></span>
             <strong>Rules API connection pending</strong>
-            <p>The Rules screen is ready. Saved rules will appear after the backend endpoint and credentials are connected.</p>
+            <p>The Rules screen is ready. Saved rules will appear after the backend provides a Rules API endpoint.</p>
           </div>
         ) : rules.length ? (
           <div className="rule-list">

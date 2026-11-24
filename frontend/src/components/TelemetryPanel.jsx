@@ -14,7 +14,7 @@ function deviceTypeOf(device) {
 }
 
 function fallbackReadingOf(device) {
-  const value = device?.lastValue ?? device?.latestValue ?? device?.value;
+  const value = device?.lastValue ?? device?.latestValue ?? device?.latestTelemetry?.value ?? device?.value;
   if (value && typeof value === 'object') {
     return value.value ?? value.reading ?? value.temperature ?? value.humidity ?? '—';
   }
@@ -23,7 +23,7 @@ function fallbackReadingOf(device) {
 
 function unitOf(device) {
   const reading = device?.lastValue ?? device?.latestValue ?? device?.value;
-  return device?.unit || device?.readingUnit || (reading && typeof reading === 'object' ? reading.unit : '') || '';
+  return device?.unit || device?.readingUnit || device?.latestTelemetry?.unit || (reading && typeof reading === 'object' ? reading.unit : '') || '';
 }
 
 function metricReadingsOf(device) {
@@ -33,6 +33,11 @@ function metricReadingsOf(device) {
       .filter(([, value]) => value !== null && value !== undefined && Number.isFinite(Number(value)))
       .map(([metric, value]) => ({ metric, value }));
     if (readings.length) return readings;
+  }
+
+  const telemetry = device?.latestTelemetry;
+  if (telemetry?.metric && telemetry.value !== null && telemetry.value !== undefined && Number.isFinite(Number(telemetry.value))) {
+    return [{ metric: telemetry.metric, value: telemetry.value, unit: telemetry.unit || device?.unit || '' }];
   }
 
   const fallback = fallbackReadingOf(device);
@@ -237,7 +242,7 @@ export default function TelemetryPanel({ onOpenDevices }) {
           <TelemetryHistory
             deviceId={selectedDeviceId}
             deviceName={selectedDevice?.name || selectedDeviceId}
-            unit={selectedDevice?.unit || ''}
+            unit={selectedDevice?.unit || selectedDevice?.latestTelemetry?.unit || ''}
           />
           <p className="telemetry-panel-footnote">Current values and recent history are loaded from the NexusFlow telemetry API.</p>
         </>
