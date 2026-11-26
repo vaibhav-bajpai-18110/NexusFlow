@@ -1,22 +1,17 @@
-
 const Telemetry = require("../models/Telemetry");
-
-// Save a new telemetry record
+// Save a new telemetry record.
+// Mongoose validates the record before saving it.
 const saveTelemetry = async (telemetryData) => {
-  const telemetry = await Telemetry.create(telemetryData);
-  return telemetry;
+  return Telemetry.create(telemetryData);
 };
-
-// Get telemetry records for a device
+// Get telemetry records for a device, newest first.
 const getTelemetryByDevice = async (deviceId) => {
-  if (!deviceId || typeof deviceId !== "string") {
+  if (typeof deviceId !== "string" || !deviceId.trim()) {
     throw new Error("A valid deviceId is required");
   }
-
-  return Telemetry.find({ deviceId })
+  return Telemetry.find({ deviceId: deviceId.trim() })
     .sort({ timestamp: -1 });
 };
-
 module.exports = {
   saveTelemetry,
   getTelemetryByDevice
