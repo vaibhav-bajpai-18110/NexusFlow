@@ -19,6 +19,7 @@ describe('Backend server & /api/health', () => {
     assert.equal(typeof body.timestamp, 'string');
     assert.equal(typeof body.uptimeSeconds, 'number');
     assert.equal(typeof body.memoryUsageMB.rss, 'number');
+    assert.ok(['connected', 'disconnected'].includes(body.database));
   });
 
   it('returns 404 JSON error for unknown routes', async () => {

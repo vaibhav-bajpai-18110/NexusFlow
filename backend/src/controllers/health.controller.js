@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { env } from '../config/env.js';
 
 /**
@@ -12,6 +13,7 @@ export function getHealth(_req, res) {
     status: 'ok',
     service: env.serviceName,
     environment: env.nodeEnv,
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     timestamp: new Date().toISOString(),
     uptimeSeconds: Number(process.uptime().toFixed(2)),
     memoryUsageMB: {
