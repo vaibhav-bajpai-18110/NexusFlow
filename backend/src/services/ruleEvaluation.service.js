@@ -249,6 +249,7 @@ export class RuleEvaluationService extends EventEmitter {
       value: metricValue,
       operator,
       threshold,
+      severity: matched ? rule.action?.severity || 'warning' : null,
       action: matched ? rule.action || null : null,
       reason,
       evaluatedAt,
@@ -404,6 +405,13 @@ export class RuleEvaluationService extends EventEmitter {
       totalNonMatches: 0,
       totalAlertsEmitted: 0,
     };
+  }
+
+  /**
+   * Alias for clearAlerts to reset service state in tests.
+   */
+  reset() {
+    this.clearAlerts();
   }
 
   /**

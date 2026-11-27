@@ -14,6 +14,7 @@ const router = Router();
 // Ingestion endpoints
 router.post('/', validateTelemetry, ingestTelemetry);
 router.post('/ingest', validateTelemetry, ingestTelemetry);
+router.post('/batch', validateTelemetry, ingestTelemetry);
 
 // Named query endpoints (placed before parameter routes)
 router.get('/latest', validateTelemetryQuery, getLatestTelemetry);

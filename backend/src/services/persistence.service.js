@@ -18,10 +18,8 @@ function scheduleWrite(operation) {
     return;
   }
 
-  const task = Promise.resolve().then(operation);
-  pendingWrites.add(task);
-
-  task
+  const task = Promise.resolve()
+    .then(operation)
     .catch((error) => {
       console.error('[Persistence] Async write error:', error.message);
       writeErrors.push(error);
@@ -29,6 +27,8 @@ function scheduleWrite(operation) {
     .finally(() => {
       pendingWrites.delete(task);
     });
+
+  pendingWrites.add(task);
 }
 
 /**
@@ -145,8 +145,17 @@ export async function initializePersistence() {
   if (savedTelemetry.length > 0) {
     telemetryService.history = savedTelemetry.reverse().map((doc) => ({
       deviceId: doc.deviceId,
+      sensorId: doc.sensorId || null,
       timestamp: new Date(doc.timestamp).toISOString(),
-      metrics: doc.metrics || (doc.metric ? { [doc.metric]: doc.value } : {}),
+      metric: doc.metric || null,
+      value: doc.value ?? null,
+      unit: doc.unit || '',
+      metrics:
+        doc.metrics && Object.keys(doc.metrics).length > 0
+          ? doc.metrics
+          : doc.metric && doc.value !== null
+            ? { [doc.metric]: doc.value }
+            : {},
       receivedAt: doc.receivedAt
         ? new Date(doc.receivedAt).toISOString()
         : new Date(doc.timestamp).toISOString(),
@@ -174,7 +183,21 @@ export async function initializePersistence() {
     scheduleWrite(() =>
       Telemetry.create({
         deviceId: record.deviceId,
+        sensorId: record.sensorId || null,
         timestamp: new Date(record.timestamp || Date.now()),
+        metric:
+          record.metric ||
+          (record.metrics && Object.keys(record.metrics).length > 0
+            ? Object.keys(record.metrics)[0]
+            : null) ||
+          null,
+        value:
+          record.value !== undefined
+            ? record.value
+            : record.metrics && Object.keys(record.metrics).length > 0
+              ? record.metrics[Object.keys(record.metrics)[0]]
+              : null,
+        unit: record.unit || '',
         metrics: record.metrics || {},
         receivedAt: new Date(record.receivedAt || record.ingestedAt || Date.now()),
         metadata: record.metadata || {},
@@ -213,6 +236,73 @@ export async function initializePersistence() {
   console.log(
     `[Persistence] Successfully synchronized with MongoDB: ${savedDevices.length} devices, ${savedTelemetry.length} telemetry records, ${savedRules.length} rules.`
   );
+}
+
+/**
+ * Saves a telemetry record to MongoDB (Manya's database service interface).
+ * Fallback to in-memory telemetryService if database is not connected.
+ * @param {object} telemetryData
+ * @returns {Promise<object>}
+ */
+export async function saveTelemetry(telemetryData) {
+  if (isDatabaseConnected()) {
+    const doc = await Telemetry.create(telemetryData);
+    const normalized = {
+      deviceId: doc.deviceId,
+      sensorId: doc.sensorId || null,
+      timestamp: new Date(doc.timestamp).toISOString(),
+      metric: doc.metric || null,
+      value: doc.value ?? null,
+      unit: doc.unit || '',
+      metrics:
+        doc.metrics && Object.keys(doc.metrics).length > 0
+          ? doc.metrics
+          : doc.metric && doc.value !== null
+            ? { [doc.metric]: doc.value }
+            : {},
+      receivedAt: doc.receivedAt
+        ? new Date(doc.receivedAt).toISOString()
+        : new Date().toISOString(),
+      metadata: doc.metadata || {},
+    };
+    telemetryService.ingest(normalized);
+    return doc;
+  }
+  return telemetryService.ingest(telemetryData);
+}
+
+/**
+ * Retrieves telemetry records for a device from MongoDB (Manya's database service interface).
+ * Fallback to in-memory telemetryService if database is not connected.
+ * @param {string} deviceId
+ * @returns {Promise<Array<object>>}
+ */
+export async function getTelemetryByDevice(deviceId) {
+  if (!deviceId || typeof deviceId !== 'string') {
+    throw new Error('A valid deviceId is required');
+  }
+
+  if (isDatabaseConnected()) {
+    return await Telemetry.find({ deviceId }).sort({ timestamp: -1 });
+  }
+
+  const result = telemetryService.getHistory({ deviceId, limit: 1000 });
+  return result.records;
+}
+
+/**
+ * Retrieves errors recorded during async persistence writes.
+ * @returns {Array<Error>}
+ */
+export function getPersistenceErrors() {
+  return [...writeErrors];
+}
+
+/**
+ * Clears recorded persistence errors.
+ */
+export function clearPersistenceErrors() {
+  writeErrors.length = 0;
 }
 
 /**

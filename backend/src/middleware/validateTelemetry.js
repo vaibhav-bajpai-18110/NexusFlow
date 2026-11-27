@@ -8,6 +8,13 @@ const RESERVED_KEYS = new Set([
   'readings',
   'data',
   'receivedat',
+  'ingestedat',
+  'sensorid',
+  'sensor_id',
+  'metric',
+  'value',
+  'unit',
+  'metadata',
 ]);
 
 /**
@@ -80,9 +87,86 @@ export function validateSingleTelemetry(item, itemPrefix = '') {
     normalizedTimestamp = new Date().toISOString();
   }
 
-  // 3. Extract and validate metrics / readings
+  // 3. Validate optional sensorId, unit, and metadata
+  let normalizedSensorId = null;
+  const rawSensorId = item.sensorId ?? item.sensor_id;
+  if (rawSensorId !== undefined && rawSensorId !== null) {
+    if (typeof rawSensorId !== 'string' && typeof rawSensorId !== 'number') {
+      errors.push({
+        field: itemPrefix ? `${itemPrefix}.sensorId` : 'sensorId',
+        message: 'sensorId must be a string or number',
+      });
+    } else {
+      normalizedSensorId = String(rawSensorId).trim();
+    }
+  }
+
+  let normalizedUnit = '';
+  if (item.unit !== undefined && item.unit !== null) {
+    if (typeof item.unit !== 'string') {
+      errors.push({
+        field: itemPrefix ? `${itemPrefix}.unit` : 'unit',
+        message: 'unit must be a string',
+      });
+    } else {
+      normalizedUnit = item.unit.trim();
+    }
+  }
+
+  let normalizedMetadata = {};
+  if (item.metadata !== undefined && item.metadata !== null) {
+    if (typeof item.metadata !== 'object' || Array.isArray(item.metadata)) {
+      errors.push({
+        field: itemPrefix ? `${itemPrefix}.metadata` : 'metadata',
+        message: 'metadata must be a JSON object',
+      });
+    } else {
+      normalizedMetadata = item.metadata;
+    }
+  }
+
+  // 4. Extract and validate metrics / readings
   const collectedMetrics = {};
   const metricCandidates = {};
+
+  // Check explicit single-metric format ({ metric, value })
+  if (item.metric !== undefined || item.value !== undefined) {
+    const metricField = itemPrefix ? `${itemPrefix}.metric` : 'metric';
+    const valueField = itemPrefix ? `${itemPrefix}.value` : 'value';
+
+    if (item.metric === undefined || item.metric === null || typeof item.metric !== 'string' || item.metric.trim() === '') {
+      errors.push({
+        field: metricField,
+        message: 'metric is required and must be a non-empty string when value is provided',
+      });
+    } else if (item.value === undefined || item.value === null) {
+      errors.push({
+        field: valueField,
+        message: 'value is required when metric is provided',
+      });
+    } else {
+      const metricName = item.metric.trim();
+      const val = item.value;
+
+      if (typeof val === 'number') {
+        if (!Number.isFinite(val)) {
+          errors.push({
+            field: valueField,
+            message: `Metric "${metricName}" must be a finite number`,
+          });
+        } else {
+          collectedMetrics[metricName] = val;
+        }
+      } else if (typeof val === 'string' && val.trim() !== '' && Number.isFinite(Number(val))) {
+        collectedMetrics[metricName] = Number(val);
+      } else {
+        errors.push({
+          field: valueField,
+          message: `Metric "${metricName}" must be a valid number, received ${typeof val}`,
+        });
+      }
+    }
+  }
 
   // Root level flat fields
   for (const [key, value] of Object.entries(item)) {
@@ -103,36 +187,36 @@ export function validateSingleTelemetry(item, itemPrefix = '') {
 
   const candidateKeys = Object.keys(metricCandidates);
 
-  if (candidateKeys.length === 0) {
+  for (const key of candidateKeys) {
+    const val = metricCandidates[key];
+    const metricField = itemPrefix ? `${itemPrefix}.${key}` : key;
+
+    if (typeof val === 'number') {
+      if (!Number.isFinite(val)) {
+        errors.push({
+          field: metricField,
+          message: `Metric "${key}" must be a finite number`,
+        });
+      } else {
+        collectedMetrics[key] = val;
+      }
+    } else if (typeof val === 'string' && val.trim() !== '' && Number.isFinite(Number(val))) {
+      // Coerce parseable numeric string (e.g. "85.2") to number
+      collectedMetrics[key] = Number(val);
+    } else {
+      errors.push({
+        field: metricField,
+        message: `Metric "${key}" must be a valid number, received ${typeof val}`,
+      });
+    }
+  }
+
+  if (Object.keys(collectedMetrics).length === 0) {
     errors.push({
       field: itemPrefix ? `${itemPrefix}.metrics` : 'metrics',
       message:
         'At least one numeric sensor metric (e.g., temperature, pressure, vibration) is required',
     });
-  } else {
-    for (const key of candidateKeys) {
-      const val = metricCandidates[key];
-      const metricField = itemPrefix ? `${itemPrefix}.${key}` : key;
-
-      if (typeof val === 'number') {
-        if (!Number.isFinite(val)) {
-          errors.push({
-            field: metricField,
-            message: `Metric "${key}" must be a finite number`,
-          });
-        } else {
-          collectedMetrics[key] = val;
-        }
-      } else if (typeof val === 'string' && val.trim() !== '' && Number.isFinite(Number(val))) {
-        // Coerce parseable numeric string (e.g. "85.2") to number
-        collectedMetrics[key] = Number(val);
-      } else {
-        errors.push({
-          field: metricField,
-          message: `Metric "${key}" must be a valid number, received ${typeof val}`,
-        });
-      }
-    }
   }
 
   if (errors.length > 0) {
@@ -142,10 +226,22 @@ export function validateSingleTelemetry(item, itemPrefix = '') {
   const deviceId = rawDeviceId.trim();
   const receivedAt = new Date().toISOString();
 
+  const primaryMetric = (item.metric && typeof item.metric === 'string')
+    ? item.metric.trim()
+    : Object.keys(collectedMetrics)[0] || null;
+  const primaryValue = (item.value !== undefined && Number.isFinite(Number(item.value)))
+    ? Number(item.value)
+    : (primaryMetric ? collectedMetrics[primaryMetric] : null);
+
   const normalized = {
     deviceId,
+    sensorId: normalizedSensorId,
     timestamp: normalizedTimestamp,
+    metric: primaryMetric,
+    value: primaryValue,
+    unit: normalizedUnit,
     metrics: collectedMetrics,
+    metadata: normalizedMetadata,
     ...collectedMetrics,
     receivedAt,
   };
@@ -168,8 +264,16 @@ export function validateTelemetry(req, _res, next) {
     );
   }
 
-  if (Array.isArray(body)) {
-    if (body.length === 0) {
+  const rawBatch = Array.isArray(body)
+    ? body
+    : (body?.batch && Array.isArray(body.batch))
+      ? body.batch
+      : (body?.data && Array.isArray(body.data))
+        ? body.data
+        : null;
+
+  if (rawBatch !== null) {
+    if (rawBatch.length === 0) {
       return next(
         new AppError('Telemetry batch array cannot be empty', 400, [
           { field: 'body', message: 'Batch telemetry array must contain at least one item' },
@@ -177,7 +281,7 @@ export function validateTelemetry(req, _res, next) {
       );
     }
 
-    if (body.length > 500) {
+    if (rawBatch.length > 500) {
       return next(
         new AppError('Telemetry batch exceeds maximum allowed limit of 500 items', 400, [
           { field: 'body', message: 'Max batch limit is 500 items' },
@@ -188,8 +292,8 @@ export function validateTelemetry(req, _res, next) {
     const allErrors = [];
     const normalizedList = [];
 
-    for (let i = 0; i < body.length; i++) {
-      const result = validateSingleTelemetry(body[i], `[${i}]`);
+    for (let i = 0; i < rawBatch.length; i++) {
+      const result = validateSingleTelemetry(rawBatch[i], `[${i}]`);
       if (!result.valid) {
         allErrors.push(...result.errors);
       } else {

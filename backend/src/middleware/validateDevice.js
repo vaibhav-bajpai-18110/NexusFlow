@@ -223,3 +223,40 @@ export function validateUpdateDevice(req, _res, next) {
 
   return next();
 }
+
+/**
+ * Validates route parameter :id / :deviceId.
+ * Ensures format complies with standard device ID pattern (2-50 alphanumeric, - or _).
+ */
+export function validateDeviceIdParam(req, _res, next) {
+  const rawId = req.params.id || req.params.deviceId;
+  if (!rawId || typeof rawId !== 'string') {
+    return next(
+      new AppError('Device ID parameter is required', 400, [
+        { field: 'deviceId', message: 'Device ID parameter must be a non-empty string' },
+      ])
+    );
+  }
+
+  const trimmed = rawId.trim();
+  if (trimmed.length < 2 || trimmed.length > 50) {
+    return next(
+      new AppError('Device ID must be between 2 and 50 characters long', 400, [
+        { field: 'deviceId', message: 'Device ID must be between 2 and 50 characters long' },
+      ])
+    );
+  }
+
+  if (!DEVICE_ID_REGEX.test(trimmed)) {
+    return next(
+      new AppError('Device ID contains invalid characters', 400, [
+        {
+          field: 'deviceId',
+          message: 'Device ID can only contain letters, numbers, hyphens (-), and underscores (_)',
+        },
+      ])
+    );
+  }
+
+  return next();
+}
