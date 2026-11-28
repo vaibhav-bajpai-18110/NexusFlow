@@ -3,11 +3,21 @@ import app from './app.js';
 import { connectDB, disconnectDB } from './config/db.js';
 import { env } from './config/env.js';
 import { initializePersistence } from './services/persistence.service.js';
+import { websocketService } from './services/websocket.service.js';
 
 const server = http.createServer(app);
 
+// Initialize real-time WebSocket broadcasting server
+websocketService.init(server, { path: '/ws' });
+
 async function shutdown(signal) {
   console.log(`\nReceived ${signal}. Shutting down ${env.serviceName} gracefully...`);
+
+  try {
+    await websocketService.close();
+  } catch (err) {
+    console.error('Error while closing WebSocket server:', err.message);
+  }
 
   try {
     await disconnectDB();

@@ -50,7 +50,7 @@ export async function flushPersistence() {
  * Converts a Mongoose Device document into a clean API record.
  * @param {object} doc
  */
-function toDeviceRecord(doc) {
+export function toDeviceRecord(doc) {
   return {
     deviceId: doc.deviceId,
     id: doc.deviceId,
@@ -69,11 +69,7 @@ function toDeviceRecord(doc) {
   };
 }
 
-/**
- * Converts a Device record into a MongoDB document structure.
- * @param {object} record
- */
-function toDeviceDocument(record) {
+export function toDeviceDocument(record) {
   return {
     deviceId: record.deviceId,
     name: record.name || record.deviceId,
@@ -311,4 +307,161 @@ export function clearPersistenceErrors() {
  */
 export function isDatabaseConnected() {
   return mongoose.connection.readyState === 1;
+}
+
+/**
+ * Saves/registers a device record to MongoDB and syncs in-memory registry.
+ * Fallback to in-memory deviceService if database is not connected.
+ * @param {object} deviceData
+ * @returns {Promise<object>}
+ */
+export async function saveDevice(deviceData) {
+  const rawId = deviceData.deviceId ?? deviceData.device_id ?? deviceData.id;
+  const normalizedId = rawId ? rawId.toString().toUpperCase().trim() : '';
+
+  if (!normalizedId) {
+    throw new Error('deviceId is required');
+  }
+
+  if (isDatabaseConnected()) {
+    const existing = await Device.findOne({ deviceId: normalizedId }).lean();
+    if (existing) {
+      const err = new Error(`Device with ID "${normalizedId}" already exists`);
+      err.statusCode = 409;
+      throw err;
+    }
+
+    const docData = toDeviceDocument({
+      ...deviceData,
+      deviceId: normalizedId,
+    });
+
+    const created = await Device.create(docData);
+    const record = toDeviceRecord(created);
+    deviceService.devices.set(normalizedId, record);
+    deviceService.emit('deviceCreated', record);
+    return record;
+  }
+
+  return deviceService.create(deviceData);
+}
+
+/**
+ * Retrieves a device by its deviceId from MongoDB or in-memory registry.
+ * @param {string} deviceId
+ * @returns {Promise<object|null>}
+ */
+export async function getDeviceById(deviceId) {
+  if (!deviceId) return null;
+  const normalizedId = deviceId.toString().toUpperCase().trim();
+
+  if (isDatabaseConnected()) {
+    const doc = await Device.findOne({ deviceId: normalizedId }).lean();
+    if (doc) {
+      const record = toDeviceRecord(doc);
+      deviceService.devices.set(normalizedId, record);
+      return record;
+    }
+    return null;
+  }
+
+  return deviceService.getById(normalizedId);
+}
+
+/**
+ * Retrieves all devices matching optional filters from MongoDB or in-memory registry.
+ * @param {object} [filter]
+ * @returns {Promise<Array<object>>}
+ */
+export async function getAllDevices(filter = {}) {
+  if (isDatabaseConnected()) {
+    const query = {};
+    if (filter.status) {
+      query.status = filter.status.toLowerCase().trim();
+    }
+    if (filter.type) {
+      query.deviceType = new RegExp(`^${filter.type.trim()}$`, 'i');
+    }
+    if (filter.search) {
+      const q = filter.search.trim();
+      query.$or = [
+        { deviceId: new RegExp(q, 'i') },
+        { name: new RegExp(q, 'i') },
+        { location: new RegExp(q, 'i') },
+      ];
+    }
+
+    const docs = await Device.find(query).sort({ deviceId: 1 }).lean();
+    const records = docs.map(toDeviceRecord);
+    for (const r of records) {
+      deviceService.devices.set(r.deviceId.toUpperCase(), r);
+    }
+    return records;
+  }
+
+  return deviceService.getAll(filter);
+}
+
+/**
+ * Updates a device in MongoDB and syncs in-memory registry.
+ * @param {string} deviceId
+ * @param {object} updateData
+ * @returns {Promise<object|null>}
+ */
+export async function updateDeviceInDB(deviceId, updateData) {
+  if (!deviceId) return null;
+  const normalizedId = deviceId.toString().toUpperCase().trim();
+
+  if (isDatabaseConnected()) {
+    const updatePayload = {};
+    if (updateData.name !== undefined) updatePayload.name = updateData.name.trim();
+    if (updateData.type !== undefined) updatePayload.deviceType = updateData.type.trim();
+    if (updateData.unit !== undefined) updatePayload.unit = updateData.unit.trim();
+    if (updateData.status !== undefined) updatePayload.status = updateData.status.toLowerCase().trim();
+    if (updateData.location !== undefined) updatePayload.location = updateData.location;
+    if (updateData.description !== undefined) updatePayload.description = updateData.description.trim();
+    if (updateData.metadata !== undefined) updatePayload.metadata = updateData.metadata;
+
+    const doc = await Device.findOneAndUpdate(
+      { deviceId: normalizedId },
+      { $set: updatePayload },
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!doc) {
+      return null;
+    }
+
+    const record = toDeviceRecord(doc);
+    deviceService.devices.set(normalizedId, record);
+    deviceService.emit('deviceUpdated', record);
+    return record;
+  }
+
+  return deviceService.update(deviceId, updateData);
+}
+
+/**
+ * Deletes a device from MongoDB and syncs in-memory registry.
+ * @param {string} deviceId
+ * @returns {Promise<boolean>}
+ */
+export async function deleteDeviceFromDB(deviceId) {
+  if (!deviceId) return false;
+  const normalizedId = deviceId.toString().toUpperCase().trim();
+
+  if (isDatabaseConnected()) {
+    const result = await Device.deleteOne({ deviceId: normalizedId });
+    if (result.deletedCount > 0) {
+      const existing = deviceService.devices.get(normalizedId);
+      deviceService.devices.delete(normalizedId);
+      if (existing) {
+        deviceService.emit('deviceDeleted', existing);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  return deviceService.delete(deviceId);
 }

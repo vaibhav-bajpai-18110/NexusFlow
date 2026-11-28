@@ -22,8 +22,20 @@ class TelemetryService extends EventEmitter {
    * @returns {object} The ingested record
    */
   ingest(event) {
+    const metrics = { ...(event.metrics || {}) };
+    for (const [k, v] of Object.entries(event)) {
+      if (typeof v === 'number' && Number.isFinite(v) && k !== 'timestamp' && k !== 'value') {
+        metrics[k] = v;
+      }
+    }
+    if (event.metric && event.value !== undefined && typeof event.metric === 'string') {
+      metrics[event.metric] = Number(event.value);
+    }
+
     const record = {
       ...event,
+      metrics,
+      ...metrics,
       ingestedAt: new Date().toISOString(),
     };
 

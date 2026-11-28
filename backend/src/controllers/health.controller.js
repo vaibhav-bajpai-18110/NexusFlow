@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { env } from '../config/env.js';
+import { websocketService } from '../services/websocket.service.js';
 
 /**
  * Returns service health and runtime metadata.
@@ -14,6 +15,7 @@ export function getHealth(_req, res) {
     service: env.serviceName,
     environment: env.nodeEnv,
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    websocket: websocketService.getStats(),
     timestamp: new Date().toISOString(),
     uptimeSeconds: Number(process.uptime().toFixed(2)),
     memoryUsageMB: {

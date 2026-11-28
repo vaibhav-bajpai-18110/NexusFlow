@@ -22,6 +22,8 @@ router.get('/history', validateTelemetryQuery, getTelemetryHistory);
 router.get('/stats', getTelemetryStats);
 router.get('/devices/:deviceId/latest', validateTelemetryQuery, getLatestTelemetry);
 router.get('/devices/:deviceId', validateTelemetryQuery, getTelemetry);
+router.get('/device/:deviceId/latest', validateTelemetryQuery, getLatestTelemetry);
+router.get('/device/:deviceId', validateTelemetryQuery, getTelemetry);
 
 // Device-wise parameter routes
 router.get('/:deviceId/latest', validateTelemetryQuery, getLatestTelemetry);
